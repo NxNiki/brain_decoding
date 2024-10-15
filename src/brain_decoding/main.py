@@ -5,7 +5,7 @@ import random
 import string
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import torch
@@ -30,8 +30,8 @@ from brain_decoding.param.base_param import device
 def set_config(
     config_file: Union[str, Path],
     patient_id: int,
-    spike_data_sd: Union[List[int], int] = 3.5,
-    spike_data_sd_inference: int = 3.5,
+    spike_data_sd: Union[List[float], float, None] = None,
+    spike_data_sd_inference: Optional[float] = None,
 ) -> PipelineConfig:
     """
     set parameters based on config file.
@@ -42,15 +42,18 @@ def set_config(
     :return:
     """
 
-    if isinstance(spike_data_sd, int):
+    if isinstance(spike_data_sd, float):
         spike_data_sd = [spike_data_sd]
 
     config = PipelineConfig.read_config(config_file)
 
     config.experiment["patient"] = patient_id
     config.experiment.name = "8concepts"
-    config.data.spike_data_sd = spike_data_sd
-    config.data.spike_data_sd_inference = spike_data_sd_inference
+
+    if spike_data_sd is not None:
+        config.data.spike_data_sd = spike_data_sd
+    if spike_data_sd_inference is not None:
+        config.data.spike_data_sd_inference = spike_data_sd_inference
 
     output_folder = f"{patient_id}_{config.data.data_type}_{config.model.architecture}_test53_optimalX_CARX"
     output_path = os.path.join(config.data.result_path, config.experiment.name, output_folder)
