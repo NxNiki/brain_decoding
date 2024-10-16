@@ -27,6 +27,7 @@ pyarrow = "^17.0.0"
 scipy = "^1.14.1"
 pydantic = "^2.8.1"
 mat73 = "^0.61"
+kneed = "0.8.1"
 
 [tool.poetry.dev-dependencies]
 black = "^23.0"
