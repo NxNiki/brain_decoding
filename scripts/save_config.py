@@ -7,7 +7,7 @@ from brain_decoding.config.config import ExperimentConfig, PipelineConfig
 from brain_decoding.config.file_path import CONFIG_FILE_PATH, DATA_PATH, RESULT_PATH
 
 if __name__ == "__main__":
-    experiment_config = ExperimentConfig(name="test", patient=562)
+    experiment_config = ExperimentConfig(name="test_sleep", patient=562)
 
     config = PipelineConfig(experiment=experiment_config)
     config.model.architecture = "multi-vit"
@@ -34,12 +34,13 @@ if __name__ == "__main__":
     config.experiment.use_combined = False
     config.experiment.use_shuffle = True
     config.experiment.use_bipolar = False
-    config.experiment.use_sleep = False
+    config.experiment.use_sleep = True  # set true to use sleep data as inference dataset, otherwise use free recall
     config.experiment.use_overlap = False
     config.experiment.use_long_input = False
     config.experiment.use_spontaneous = False
     config.experiment.use_augment = False
     config.experiment.use_shuffle_diagnostic = True
+    config.experiment.testing_mode = True  # in testing mode, a maximum of 1e4 clusterless data will be loaded.
     config.experiment.model_aggregate_type = "sum"
 
     config.data.result_path = str(RESULT_PATH)
@@ -50,9 +51,6 @@ if __name__ == "__main__":
     config.data.spike_data_mode_inference = "notch CAR-quant-neg"
     config.data.spike_data_sd = [3.5]
     config.data.spike_data_sd_inference = 3.5
-    config.data.use_augment = False
-    config.data.use_long_input = False
-    config.data.use_shuffle_diagnostic = False
     config.data.model_aggregate_type = "sum"
     config.data.movie_label_path = str(DATA_PATH / "8concepts_merged.npy")
     config.data.movie_sampling_rate = 30

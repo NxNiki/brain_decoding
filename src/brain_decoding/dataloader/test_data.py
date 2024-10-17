@@ -2,6 +2,7 @@ import glob
 import os
 import pickle
 import re
+import warnings
 from logging import warning
 from typing import Dict, List, Optional, Union
 
@@ -19,6 +20,8 @@ from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 from torchvision.transforms import transforms
 
+from brain_decoding.dataloader.train_data import sort_file_name
+
 
 class InferenceDataset(Dataset):
     def __init__(self, config):
@@ -30,7 +33,7 @@ class InferenceDataset(Dataset):
             data_path = "spike_path"
             if self.config.experiment["use_sleep"]:
                 config.experiment["spike_data_mode_inference"] = ""
-                spikes_data = self.read_recording_data(data_path, "time_sleep", "")
+                spikes_data = self.read_recording_data(data_path, "time_sleep", "1")
             else:
                 if (
                     isinstance(self.config.experiment["free_recall_phase"], str)
@@ -96,7 +99,7 @@ class InferenceDataset(Dataset):
             exp_file_path,
         )
         recording_files = glob.glob(os.path.join(recording_file_path, "*.npz"))
-        recording_files = sorted(recording_files, key=self.sort_filename)
+        recording_files = sorted(recording_files, key=sort_file_name)
 
         if not recording_files:
             raise ValueError(f"not files found in: {recording_files}")
@@ -109,11 +112,6 @@ class InferenceDataset(Dataset):
             raise ValueError(f"Unrecognized root_path: {root_path}, use 'spike_path' or 'lfp_path'")
 
         return data
-
-    @staticmethod
-    def sort_filename(filename):
-        """Extract the numeric part of the filename and use it as the sort key"""
-        return [int(x) if x.isdigit() else x for x in re.findall(r"\d+|\D+", filename)]
 
     @staticmethod
     def channel_max(data):
@@ -129,12 +127,22 @@ class InferenceDataset(Dataset):
         spike = []
         for file in files:
             print(f"load clustless file: {file}")
-            data = np.load(file)["data"]
+            data_file = np.load(file)
+            if "data" in data_file.files:
+                data = data_file["data"].astype(np.float32)
+            else:
+                data = data_file["arr_0"].astype(np.float32)
             if data.size == 0:
                 warning(f"{file} is empty!")
             spike.append(data[:, :, None])
 
-        spike = np.concatenate(spike, axis=2)
+        # spike = np.concatenate(spike, axis=2)
+        if self.config.experiment["testing_mode"]:
+            print("loading partial test data in testing mode!")
+            spike = concatenate_with_padding(spike, int(1e4))
+        else:
+            spike = concatenate_with_padding(spike)
+
         # sd1 = spike[:, 0:1, :, :]
         # sd2 = spike[:, 1:2, :, :]
         # sd3 = spike[:, 2:3, :, :]
@@ -368,3 +376,38 @@ def create_inference_combined_loaders(
         shuffle=shuffle,
     )
     return inference_loader
+
+
+def concatenate_with_padding(arrays: List[np.ndarray], max_length: Optional[int] = None) -> np.ndarray:
+    """
+    Concatenate a list of 3D numpy arrays of shape (n, 6, 1) along the third axis (axis=2).
+    If the arrays have different lengths along the first axis, shorter arrays will be padded with zeros.
+    A warning is issued when arrays have different lengths.
+    """
+    if max_length is None:
+        # Get the maximum length across all arrays (axis=0, the first dimension)
+        max_length: int = max(array.shape[0] for array in arrays)
+
+    # Initialize a list to hold the padded arrays
+    padded_arrays: List[np.ndarray] = []
+
+    # Iterate through the arrays and pad shorter ones
+    for i, array in enumerate(arrays):
+        if array.shape[0] < max_length:
+            warnings.warn(
+                f"Array {i} ({array.shape}) is shorter than the maximum length {max_length}. Padding with zeros."
+            )
+            # Create padding for the short arrays along the first dimension (n)
+            padding_shape: tuple = (max_length - array.shape[0], array.shape[1], array.shape[2])
+            padding: np.ndarray = np.zeros(padding_shape)
+            # Pad the array with zeros and add to the list
+            padded_array: np.ndarray = np.concatenate([array, padding], axis=0)
+            padded_arrays.append(padded_array)
+        else:
+            # If the array is already the maximum length, just append it as is
+            padded_arrays.append(array[:max_length, :1, :])
+
+    # Concatenate the padded arrays along axis 2 (the third axis)
+    result: np.ndarray = np.concatenate(padded_arrays, axis=2)
+
+    return result

@@ -95,7 +95,7 @@ class NeuronDataset:
         if self.use_overlap:
             self.label = self.label[1:-1]
             self.smoothed_label = self.smoothed_label[1:-1]
-        # filter low occuracne sampels
+        # filter low occurrence samples
         class_value, class_count = np.unique(self.label[:, 0:8], axis=0, return_counts=True)
         occurrence_threshold = 200 * len(self.spike_data_sd)
         good_indices = np.where(class_count >= occurrence_threshold)[0]
@@ -130,7 +130,7 @@ class NeuronDataset:
                     "time_{}".format(category.lower()),
                 )
                 spike_files = glob.glob(os.path.join(spike_path, "*.npz"))
-                spike_files = sorted(spike_files, key=self._sort_file_name)
+                spike_files = sorted(spike_files, key=sort_file_name)
                 spike_data.append(self.load_clustless(spike_files, sd))
                 sample_size.append(spike_data[-1].shape[0])
 
@@ -165,11 +165,6 @@ class NeuronDataset:
         #     self.smoothed_label[2] = self.smoothed_label[2][indices_c2]
 
         return np.concatenate(spike_data, axis=0)
-
-    @staticmethod
-    def _sort_file_name(filenames: List[str]) -> List[Union[int, str]]:
-        """Extract the numeric part of the filename and use it as the sort key"""
-        return [int(x) if x.isdigit() else x for x in re.findall(r"\d+|\D+", filenames)]
 
     def smooth_label(self):
         sigma = 1
@@ -362,6 +357,11 @@ class MyDataset(Dataset):
         #     if random_number < 0.5:
         #         neuron_feature = random_shift(neuron_feature, 2)
         return (lfp, spike), label, idx
+
+
+def sort_file_name(filenames: List[str]) -> List[Union[int, str]]:
+    """Extract the numeric part of the filename and use it as the sort key"""
+    return [int(x) if x.isdigit() else x for x in re.findall(r"\d+|\D+", filenames)]
 
 
 def create_weighted_loaders(

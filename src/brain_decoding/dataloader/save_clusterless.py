@@ -114,7 +114,7 @@ FREE_RECALL_TIME = {
 }
 
 SLEEP_TIME = {
-    "562_1": (1 * 3600 + 1 * 60 + 32, 2 * 3600 + 16 * 60 + 52),  # memory test
+    "562_1": (0, 2 * 3600 + 16 * 60 + 52),  # memory test
 }
 
 CONTROL = {
