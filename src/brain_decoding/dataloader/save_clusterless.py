@@ -24,9 +24,11 @@ from scipy.signal import butter, filtfilt, find_peaks, hilbert, iirnotch, lfilte
 # from spike_localization import patient_localization_mapping
 from scipy.stats import zscore
 
+from brain_decoding.config.file_path import DATA_PATH
+
 OFFSET = {
     "555_1": 4.58,
-    "562_1": 134.194,
+    "562_1": 0,
     "563_1": 25.59,
     "564_1": [(792.79, 1945), (3732.44, 5091)],
     "564_2": [(792.79, 1945), (3732.44, 5091)],
@@ -110,6 +112,11 @@ FREE_RECALL_TIME = {
     "i728_Ctrl1R1": (13 * 60 + 43, 15 * 60 + 0),
     "i728_Ctrl2R1": (28 * 60 + 38, 36 * 60 + 15),
 }
+
+SLEEP_TIME = {
+    "562_1": (1 * 3600 + 1 * 60 + 32, 2 * 3600 + 16 * 60 + 52),  # memory test
+}
+
 CONTROL = {
     "566": [(121, 1520), (1544, 2825)],
 }
@@ -477,7 +484,7 @@ def get_oneshot_clean(patient_number, desired_samplerate, mode, category="recall
         return [int(x) if x.isdigit() else x for x in re.findall(r"\d+|\D+", filename)]
 
     # folder contains the clustless data, I saved the folder downloaded from the drive as '562/clustless_raw'
-    spike_path = f"/mnt/SSD2/yyding/Datasets/neuron/spike_data/{patient_number}/raw_{mode}/"
+    spike_path = f"{SPIKE_ROOT_PATH}/{patient_number}/{mode}/"
     spike_files = glob.glob(os.path.join(spike_path, "*.csv"))
     spike_files = sorted(spike_files, key=sort_filename)
 
@@ -489,9 +496,7 @@ def get_oneshot_clean(patient_number, desired_samplerate, mode, category="recall
         grouped = df_clean.groupby("channel")
         channel_dataframes = {channel: group for channel, group in grouped}
         for channel, data in channel_dataframes.items():
-            save_folder = (
-                f"/mnt/SSD2/yyding/Datasets/neuron/spike_data/{patient_number}/{version}/time_{category}_{phase}/"
-            )
+            save_folder = f"{DATA_PATH}/{patient_number}/{version}/time_{category}_{phase}/"
             name = re.sub(r"\d+", "", os.path.split(bundle_csv[0])[-1].split(".csv")[0])
             name_check = re.sub(r"\d+", "", os.path.split(bundle_csv[-1])[-1].split(".csv")[0])
             assert name == name_check, "wrong bundle name"
@@ -631,7 +636,8 @@ def get_oneshot_clean(patient_number, desired_samplerate, mode, category="recall
             # for i, (idx, amp) in enumerate(zip(indices1, amplitudes1)):
             #     wf_2d[0, idx] = np.max([wf_2d[0, idx], 33])
 
-            movie_label_path = "/mnt/SSD2/yyding/Datasets/12concepts/12concepts_merged_more.npy"
+            # movie_label_path = "/mnt/SSD2/yyding/Datasets/12concepts/12concepts_merged_more.npy"
+            movie_label_path = f"{DATA_PATH}/8concepts_merged.npy"
             movie_label = np.load(movie_label_path)
             resolution = 4
             # movie_label = np.repeat(movie_label, resolution, axis=1)
@@ -665,13 +671,22 @@ def get_oneshot_clean(patient_number, desired_samplerate, mode, category="recall
                     recall_end = FREE_RECALL_TIME[patient_number + "_" + str(phase)][1]
                     movie_sample_range = [(alignment_offset + recall_start) * sf, (alignment_offset + recall_end) * sf]
                     num_samples = int((movie_sample_range[1] - movie_sample_range[0]) / sf * 4)
+                elif category == "sleep":
+                    alignment_offset = 0
+                    recall_start = SLEEP_TIME[patient_number + "_" + str(phase)][0]
+                    recall_end = SLEEP_TIME[patient_number + "_" + str(phase)][1]
+                    exp_sample_range = [(alignment_offset + recall_start) * sf, (alignment_offset + recall_end) * sf]
+                    num_samples = int((exp_sample_range[1] - exp_sample_range[0]) / sf * 4)
+
             if patient_number == "565" and category == "movie":
                 movie_wf = []
                 for i, (s, e) in enumerate(movie_sample_range):
                     movie_wf.append(wf_2d[:, int(s) : int(e)])
                 movie_wf = np.concatenate(movie_wf, axis=0)
-            else:
+            elif category == "movie":
                 movie_wf = wf_2d[:, int(movie_sample_range[0]) : int(movie_sample_range[1])]
+            elif category == "sleep":
+                movie_wf = wf_2d[:, int(exp_sample_range[0]) : int(exp_sample_range[1])]
 
             final_spike_data = []
             for second in range(num_samples):
@@ -745,7 +760,7 @@ def get_oneshot_by_region(patient_number, desired_samplerate, mode, category="re
         return [int(x) if x.isdigit() else x for x in re.findall(r"\d+|\D+", filename)]
 
     # folder contains the clustless data, I saved the folder downloaded from the drive as '562/clustless_raw'
-    spike_path = f"/mnt/SSD2/yyding/Datasets/neuron/spike_data/{patient_number}/raw_{mode}/"
+    spike_path = f"{SPIKE_ROOT_PATH}/{patient_number}/raw_{mode}/"
     spike_files = glob.glob(os.path.join(spike_path, "*.npz"))
     spike_files = sorted(spike_files, key=sort_filename)
     # region_map = patient_localization_mapping[patient_number]
@@ -801,64 +816,9 @@ def get_oneshot_by_region(patient_number, desired_samplerate, mode, category="re
 
 
 if __name__ == "__main__":
-    version = "notch CAR-clean-cutoff-ch4"
-    get_oneshot_clean("563", 1000, "presleep", category="movie", phase=1, version=version)
-    get_oneshot_clean("563", 1000, "presleep", category="recall", phase="FR1", version=version)
-    get_oneshot_clean("563", 1000, "postsleep", category="recall", phase="FR2", version=version)
-    print()
-    get_oneshot_clean("562", 1000, "presleep", category="movie", phase=1, version=version)
-    get_oneshot_clean("562", 1000, "presleep", category="recall", phase="FR1", version=version)
-    get_oneshot_clean("562", 1000, "postsleep", category="recall", phase="FR2", version=version)
-    print()
-
-    get_oneshot_clean("i728", 1000, "presleep1", category="movie", phase=1, version=version)
-    get_oneshot_clean("i728", 1000, "presleep1", category="recall", phase="FR1a", version=version)
-    get_oneshot_clean("i728", 1000, "presleep2", category="recall", phase="FR1b", version=version)
-    get_oneshot_clean("i728", 1000, "presleep2", category="recall", phase="CR1", version=version)
-    get_oneshot_clean("i728", 1000, "postsleep", category="recall", phase="FR2", version=version)
-    get_oneshot_clean("i728", 1000, "postsleep", category="recall", phase="CR2", version=version)
-    print()
-    get_oneshot_clean("572", 1000, "presleep1", category="movie", phase=1, version=version)
-    get_oneshot_clean("572", 1000, "presleep2", category="recall", phase="FR1", version=version)
-    get_oneshot_clean("572", 1000, "presleep2", category="recall", phase="CR1", version=version)
-    get_oneshot_clean("572", 1000, "postsleep", category="recall", phase="FR2", version=version)
-    get_oneshot_clean("572", 1000, "postsleep", category="recall", phase="CR2", version=version)
-    print()
-    get_oneshot_clean("567", 1000, "presleep", category="movie", phase=1, version=version)
-    get_oneshot_clean("567", 1000, "presleep", category="recall", phase="FR1", version=version)
-    get_oneshot_clean("567", 1000, "presleep", category="recall", phase="CR1", version=version)
-    get_oneshot_clean("567", 1000, "postsleep", category="recall", phase="FR2", version=version)
-    get_oneshot_clean("567", 1000, "postsleep", category="recall", phase="CR2", version=version)
-    print()
-    get_oneshot_clean("566", 1000, "presleep", category="movie", phase=1, version=version)
-    get_oneshot_clean("566", 1000, "presleep", category="recall", phase="FR1", version=version)
-    get_oneshot_clean("566", 1000, "presleep", category="recall", phase="CR1", version=version)
-    get_oneshot_clean("566", 1000, "postsleep", category="recall", phase="FR2", version=version)
-    get_oneshot_clean("566", 1000, "postsleep", category="recall", phase="CR2", version=version)
-    print()
-    get_oneshot_clean("570", 1000, "presleep", category="movie", phase=1, version=version)
-    get_oneshot_clean("570", 1000, "presleep", category="recall", phase="FR1", version=version)
-    get_oneshot_clean("570", 1000, "presleep", category="recall", phase="CR1", version=version)
-    get_oneshot_clean("570", 1000, "postsleep", category="recall", phase="FR2", version=version)
-    get_oneshot_clean("570", 1000, "postsleep", category="recall", phase="CR2", version=version)
-
-    print()
-    get_oneshot_clean("573", 1000, "movie", category="movie", phase=1, version=version)
-    get_oneshot_clean("573", 1000, "presleep", category="recall", phase="FR1", version=version)
-    get_oneshot_clean("573", 1000, "presleep", category="recall", phase="CR1", version=version)
-    get_oneshot_clean("573", 1000, "postsleep", category="recall", phase="FR2", version=version)
-    get_oneshot_clean("573", 1000, "postsleep", category="recall", phase="CR2", version=version)
-
-    print()
-    get_oneshot_clean("i717", 1000, "movie", category="movie", phase=1, version=version)
-    get_oneshot_clean("i717", 1000, "presleep", category="recall", phase="FR1", version=version)
-    get_oneshot_clean("i717", 1000, "presleep", category="recall", phase="CR1", version=version)
-    get_oneshot_clean("i717", 1000, "postsleep", category="recall", phase="FR2", version=version)
-    get_oneshot_clean("i717", 1000, "postsleep", category="recall", phase="CR2", version=version)
-
-    print()
-    get_oneshot_clean("568", 1000, "presleep", category="movie", phase=1, version=version)
-    get_oneshot_clean("568", 1000, "presleep", category="recall", phase="FR1", version=version)
-    get_oneshot_clean("568", 1000, "presleep", category="recall", phase="CR1", version=version)
-    get_oneshot_clean("568", 1000, "postsleep", category="recall", phase="FR2", version=version)
-    get_oneshot_clean("568", 1000, "postsleep", category="recall", phase="CR2", version=version)
+    version = "notch CAR-quant-neg"
+    SPIKE_ROOT_PATH = "/Users/XinNiuAdmin/Library/CloudStorage/Box-Box/Vwani_Movie/Clusterless/"
+    get_oneshot_clean("562", 2000, "Experiment6_MovieParadigm_notch", category="sleep", phase=1, version=version)
+    # get_oneshot_clean("562", 2000, "presleep", category="movie", phase=1, version=version)
+    # get_oneshot_clean("562", 2000, "presleep", category="recall", phase="FR1", version=version)
+    # get_oneshot_clean("562", 2000, "postsleep", category="recall", phase="FR2", version=version)

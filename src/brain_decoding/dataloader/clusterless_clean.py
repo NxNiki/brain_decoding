@@ -160,19 +160,20 @@ def load_data_from_bundle(clu_bundle_filepaths):
     return clu_df
 
 
-# def get_oneshot_clean(patient_number, desired_samplerate, mode, category='recall', phase=None, version='notch'):
-#     def sort_filename(filename):
-#         """Extract the numeric part of the filename and use it as the sort key"""
-#         return [int(x) if x.isdigit() else x for x in re.findall(r'\d+|\D+', filename)]
-#     # folder contains the clustless data, I saved the folder downloaded from the drive as '562/clustless_raw'
-#     spike_path = f'/mnt/SSD2/yyding/Datasets/neuron/spike_data/{patient_number}/raw_{mode}/'
-#     spike_files = glob.glob(os.path.join(spike_path, '*.csv'))
-#     spike_files = sorted(spike_files, key=sort_filename)
+def get_oneshot_clean(patient_number, desired_samplerate, mode, category="recall", phase=None, version="notch"):
+    def sort_filename(filename):
+        """Extract the numeric part of the filename and use it as the sort key"""
+        return [int(x) if x.isdigit() else x for x in re.findall(r"\d+|\D+", filename)]
 
-#     for bundle in range(0, len(spike_files), 8):
-#         df = load_data_from_bundle(spike_files[bundle:bundle+8])
-#         df_clean = cross_chan_event_detection(df, 2, 4)
-#     print()
+    # folder contains the clustless data, I saved the folder downloaded from the drive as '562/clustless_raw'
+    spike_path = f"/mnt/SSD2/yyding/Datasets/neuron/spike_data/{patient_number}/raw_{mode}/"
+    spike_files = glob.glob(os.path.join(spike_path, "*.csv"))
+    spike_files = sorted(spike_files, key=sort_filename)
+
+    for bundle in range(0, len(spike_files), 8):
+        df = load_data_from_bundle(spike_files[bundle : bundle + 8])
+        df_clean = cross_chan_event_detection(df, 2, 4)
+    print()
 
 
 if __name__ == "__main__":
