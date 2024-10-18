@@ -7,16 +7,16 @@ from brain_decoding.config.config import ExperimentConfig, PipelineConfig
 from brain_decoding.config.file_path import CONFIG_FILE_PATH, DATA_PATH, RESULT_PATH
 
 if __name__ == "__main__":
-    experiment_config = ExperimentConfig(name="test_sleep", patient=562)
+    experiment_config = ExperimentConfig(name="sleep", patient=562)
 
     config = PipelineConfig(experiment=experiment_config)
     config.model.architecture = "multi-vit"
     config.model.learning_rate = 1e-4
     config.model.batch_size = 128
     config.model.weight_decay = 1e-4
-    config.model.epochs = 5
+    config.model.epochs = 40
     config.model.lr_drop = 50
-    config.model.validation_step = 2
+    config.model.validation_step = 10
     config.model.early_stop = 75
     config.model.num_labels = 8
     config.model.merge_label = True
