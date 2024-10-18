@@ -71,7 +71,6 @@ class Trainer:
         best_f1 = -1
         self.model.train()
         os.makedirs(self.config.data["train_save_path"], exist_ok=True)
-        os.makedirs(self.config.data["train_save_path"], exist_ok=True)
         for epoch in tqdm(range(epochs)):
             meter = Meter(fold)
 
@@ -361,7 +360,7 @@ class Trainer:
         np.random.seed(self.config.experiment["seed"])
         random.seed(self.config.experiment["seed"])
         self.config.experiment["free_recall_phase"] = phase
-        dataloaders = initialize_inference_dataloaders(self.config)
+        # dataloaders = initialize_inference_dataloaders(self.config)
         model = initialize_model(self.config)
         # model = torch.compile(model)
         model = model.to(device_name)

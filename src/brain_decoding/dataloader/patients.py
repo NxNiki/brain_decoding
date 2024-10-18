@@ -304,6 +304,19 @@ class Patients(BaseModel):
         self.patients[patient_id] = Patient.model_validate_json(open(file_name).read())
 
 
+def load_patients(patients_id: Union[str, List[str]], file_path: Path) -> Patients:
+    patients = Patients()
+
+    if isinstance(patients_id, str):
+        patients_id = [patients_id]
+
+    for patient_id in patients_id:
+        patient_file = file_path / f"patient_{patient_id}.json"
+        patients.read_json(patient_file, patient_id)
+
+    return patients
+
+
 # Example usage within the module (can be removed or commented out for production use)
 if __name__ == "__main__":
     patients_data = Patients()

@@ -5,7 +5,7 @@ import random
 import string
 import time
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import torch
@@ -27,20 +27,33 @@ from brain_decoding.param.base_param import device
 # torch.backends.cudnn.deterministic = True
 
 
-def set_config(config_file: Union[str, Path], patient_id: int) -> PipelineConfig:
+def set_config(
+    config_file: Union[str, Path],
+    patient_id: int,
+    spike_data_sd: Union[List[float], float, None] = None,
+    spike_data_sd_inference: Optional[float] = None,
+) -> PipelineConfig:
     """
     set parameters based on config file.
     :param config_file:
-    :param root_path:
     :param patient_id:
+    :param spike_data_sd:
+    :param spike_data_sd_inference:
     :return:
     """
+
+    if isinstance(spike_data_sd, float):
+        spike_data_sd = [spike_data_sd]
+
     config = PipelineConfig.read_config(config_file)
 
     config.experiment["patient"] = patient_id
     config.experiment.name = "8concepts"
-    config.data.spike_data_sd = [3.5]
-    config.data.spike_data_sd_inference = 3.5
+
+    if spike_data_sd is not None:
+        config.data.spike_data_sd = spike_data_sd
+    if spike_data_sd_inference is not None:
+        config.data.spike_data_sd_inference = spike_data_sd_inference
 
     output_folder = f"{patient_id}_{config.data.data_type}_{config.model.architecture}_test53_optimalX_CARX"
     output_path = os.path.join(config.data.result_path, config.experiment.name, output_folder)
@@ -87,7 +100,7 @@ def pipeline(config: PipelineConfig) -> Trainer:
 
 if __name__ == "__main__":
     patient = 562
-    config_file = CONFIG_FILE_PATH / "config_test-None-None_2024-10-02-17:31:47.yaml"
+    config_file = CONFIG_FILE_PATH / "config_sleep-None-None_2024-10-16-19:17:43.yaml"
 
     config = set_config(
         config_file,
