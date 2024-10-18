@@ -55,7 +55,10 @@ def set_config(
     if spike_data_sd_inference is not None:
         config.data.spike_data_sd_inference = spike_data_sd_inference
 
-    output_folder = f"{patient_id}_{config.data.data_type}_{config.model.architecture}_test53_optimalX_CARX"
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    output_folder = (
+        f"{patient_id}_{config.data.data_type}_{config.model.architecture}_test_optimalX_CARX_{current_time}"
+    )
     output_path = os.path.join(config.data.result_path, config.experiment.name, output_folder)
     config.data.train_save_path = os.path.join(output_path, "train")
     config.data.valid_save_path = os.path.join(output_path, "valid")

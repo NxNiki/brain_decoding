@@ -113,8 +113,10 @@ FREE_RECALL_TIME = {
     "i728_Ctrl2R1": (28 * 60 + 38, 36 * 60 + 15),
 }
 
+# is there a way to select the whole duration?
 SLEEP_TIME = {
-    "562_1": (0, 2 * 3600 + 16 * 60 + 52),  # memory test
+    "562_1": (0, 2 * 3600),  # memory test
+    "562_2": (0, 5 * 3600),  # memory test
 }
 
 CONTROL = {
@@ -818,7 +820,7 @@ def get_oneshot_by_region(patient_number, desired_samplerate, mode, category="re
 if __name__ == "__main__":
     version = "notch CAR-quant-neg"
     SPIKE_ROOT_PATH = "/Users/XinNiuAdmin/Library/CloudStorage/Box-Box/Vwani_Movie/Clusterless/"
-    get_oneshot_clean("562", 2000, "Experiment6_MovieParadigm_notch", category="sleep", phase=1, version=version)
+    get_oneshot_clean("562", 2000, "Experiment6_MovieParadigm_notch", category="sleep", phase=2, version=version)
     # get_oneshot_clean("562", 2000, "presleep", category="movie", phase=1, version=version)
     # get_oneshot_clean("562", 2000, "presleep", category="recall", phase="FR1", version=version)
     # get_oneshot_clean("562", 2000, "postsleep", category="recall", phase="FR2", version=version)

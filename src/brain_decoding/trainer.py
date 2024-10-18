@@ -360,7 +360,7 @@ class Trainer:
         np.random.seed(self.config.experiment["seed"])
         random.seed(self.config.experiment["seed"])
         self.config.experiment["free_recall_phase"] = phase
-        # dataloaders = initialize_inference_dataloaders(self.config)
+        dataloaders = initialize_inference_dataloaders(self.config)
         model = initialize_model(self.config)
         # model = torch.compile(model)
         model = model.to(device_name)
@@ -379,8 +379,8 @@ class Trainer:
         predictions_all = np.empty((0, self.config.model["num_labels"]))
         predictions_length = {}
         with torch.no_grad():
-            self.config.experiment["free_recall_phase"] = phase
-            dataloaders = initialize_inference_dataloaders(self.config)
+            # self.config.experiment["free_recall_phase"] = phase
+            # dataloaders = initialize_inference_dataloaders(self.config)
             predictions = np.empty((0, self.config.model["num_labels"]))
             # y_true = np.empty((0, self.config['num_labels']))
             for i, (feature, index) in enumerate(dataloaders["inference"]):
@@ -407,13 +407,13 @@ class Trainer:
         save_path = os.path.join(self.config.data["memory_save_path"], "prediction")
         os.makedirs(save_path, exist_ok=True)
         np.save(
-            os.path.join(save_path, "epoch{}_free_recall_{}_results.npy".format(epoch, phase)),
+            os.path.join(save_path, "epoch{}_test_{}_results.npy".format(epoch, phase)),
             predictions_all,
         )
 
         for ph in alongwith:
             self.config.experiment["free_recall_phase"] = ph
-            dataloaders = initialize_inference_dataloaders(self.config)
+            # dataloaders = initialize_inference_dataloaders(self.config)
             with torch.no_grad():
                 # load the best epoch number from the saved "model_results" structure
                 predictions = np.empty((0, self.config.model["num_labels"]))
