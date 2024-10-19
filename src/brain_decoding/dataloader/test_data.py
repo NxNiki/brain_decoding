@@ -27,19 +27,18 @@ class InferenceDataset(Dataset):
     def __init__(self, config):
         self.config = config
         self.lfp_channel_by_region = {}
-
+        phases = config.data.phases
         spikes_data = None
         if self.config.experiment["use_spike"]:
             data_path = "spike_path"
             if self.config.experiment["use_sleep"]:
                 config.experiment["spike_data_mode_inference"] = ""
-                spikes_data = self.read_recording_data(data_path, "time_sleep", "1")
+                spikes_data = self.read_recording_data(data_path, "time_sleep", phases[0])
             else:
                 if (
                     isinstance(self.config.experiment["free_recall_phase"], str)
                     and "all" in self.config.experiment["free_recall_phase"]
                 ):
-                    phases = ["FR1"]
                     for phase in phases:
                         spikes_data = self.read_recording_data(data_path, "time_recall", phase)
                 elif (
@@ -63,7 +62,6 @@ class InferenceDataset(Dataset):
                 lfp_data = self.read_recording_data(data_path, "spectrogram_sleep", "")
             else:
                 if isinstance(self.config["free_recall_phase"], str) and "all" in self.config["free_recall_phase"]:
-                    phases = [1, 2]
                     for phase in phases:
                         lfp_data = self.read_recording_data(data_path, "spectrogram_recall", phase)
                 elif (
@@ -226,17 +224,18 @@ class InferenceDataset(Dataset):
                 channel_labels.append(f"CSC{channel}_N{neuron}")
         return spike_times
 
-    def load_npz(self, mode="multi"):
-        def superVstack(a, b):
-            # make it so you can vstack onto empty row
-            if len(a) == 0:
-                stack = b
-            elif len(b) == 0:
-                stack = a
-            else:
-                stack = np.vstack([a, b])
-            return stack
+    @staticmethod
+    def vertical_stack(a, b):
+        # make it so you can v stack onto empty row
+        if len(a) == 0:
+            stack = b
+        elif len(b) == 0:
+            stack = a
+        else:
+            stack = np.vstack([a, b])
+        return stack
 
+    def load_npz(self, mode="multi"):
         if mode == "multi":
             lfp_mat = []
             lfp_files = glob.glob(os.path.join(self.lfp_data_path, "marco_lfp_spectrum_*.npz"))
@@ -244,30 +243,20 @@ class InferenceDataset(Dataset):
                 first_8_last_8 = np.load(file)["data"]
                 first_8_last_8 = np.concatenate((first_8_last_8[:8, :], first_8_last_8[-8:, :]), axis=0)
                 # first_8_last_8 = first_8_last_8[:8, :]
-                lfp_mat = superVstack(lfp_mat, first_8_last_8)
+                lfp_mat = self.vertical_stack(lfp_mat, first_8_last_8)
         else:
             fn = os.path.join(self.lfp_data_path, "marco_lfp_john.npz")
             lfp_mat = np.load(fn)["data"]
         return np.array(lfp_mat).astype(np.float32)
 
     def load_npz_by_chunk(self, hour=1):
-        def superVstack(a, b):
-            # make it so you can vstack onto empty row
-            if len(a) == 0:
-                stack = b
-            elif len(b) == 0:
-                stack = a
-            else:
-                stack = np.vstack([a, b])
-            return stack
-
         lfp_mat = []
         lfp_files = glob.glob(os.path.join(self.lfp_data_path, "marco_lfp_spectrum_*_hour_{}.npz".format(hour)))
         for file in lfp_files:
             first_8_last_8 = np.load(file)["data"]
             first_8_last_8 = np.concatenate((first_8_last_8[:8, :], first_8_last_8[-8:, :]), axis=0)
             # first_8_last_8 = first_8_last_8[:8, :]
-            lfp_mat = superVstack(lfp_mat, first_8_last_8)
+            lfp_mat = self.vertical_stack(lfp_mat, first_8_last_8)
         return np.array(lfp_mat).astype(np.float32)
 
     def load_pickle(self, fn):

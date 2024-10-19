@@ -30,6 +30,7 @@ from brain_decoding.param.base_param import device
 def set_config(
     config_file: Union[str, Path],
     patient_id: int,
+    phases: Union[List[str], str],
     spike_data_sd: Union[List[float], float, None] = None,
     spike_data_sd_inference: Optional[float] = None,
 ) -> PipelineConfig:
@@ -37,6 +38,7 @@ def set_config(
     set parameters based on config file.
     :param config_file:
     :param patient_id:
+    :param phases:
     :param spike_data_sd:
     :param spike_data_sd_inference:
     :return:
@@ -49,6 +51,11 @@ def set_config(
 
     config.experiment["patient"] = patient_id
     config.experiment.name = "8concepts"
+
+    if isinstance(phases, str):
+        config.data.phases = [phases]
+    else:
+        config.data.phases = phases
 
     if spike_data_sd is not None:
         config.data.spike_data_sd = spike_data_sd
@@ -103,11 +110,13 @@ def pipeline(config: PipelineConfig) -> Trainer:
 
 if __name__ == "__main__":
     patient = 562
-    config_file = CONFIG_FILE_PATH / "config_sleep-None-None_2024-10-16-19:17:43.yaml"
+    phase = "2"
+    CONFIG_FILE = CONFIG_FILE_PATH / "config_sleep-None-None_2024-10-16-19:17:43.yaml"
 
     config = set_config(
-        config_file,
+        CONFIG_FILE,
         patient,
+        phase,
     )
 
     print("start: ", patient)

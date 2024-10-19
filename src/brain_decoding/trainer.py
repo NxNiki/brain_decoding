@@ -144,19 +144,20 @@ class Trainer:
                 )
                 print()
                 print("WELCOME MEMORY TEST at: ", epoch)
-                stats_m = self.memory(epoch=epoch + 1, phase="free_recall1", alongwith=[])
+                stats_m = self.memory(epoch=epoch + 1, phase=self.config.data.phases[0], alongwith=[])
                 # self.memory(1, epoch=epoch+1, phase='all')
-                overall_p = list(stats_m.values())
-                print("P: ", overall_p)
-                overall_significant = len([x for x in overall_p if not np.isnan(x) and 0 <= x < 0.1])
-                overall_valid = len([x for x in overall_p if not np.isnan(x)])
-                jack_p = stats_m["Jack"]
-                print(
-                    "Jack p: ",
-                    jack_p,
-                    "overall: ",
-                    f"{overall_significant} / {overall_valid}",
-                )
+                if stats_m is not None:
+                    overall_p = list(stats_m.values())
+                    print("P: ", overall_p)
+                    overall_significant = len([x for x in overall_p if not np.isnan(x) and 0 <= x < 0.1])
+                    overall_valid = len([x for x in overall_p if not np.isnan(x)])
+                    jack_p = stats_m["Jack"]
+                    print(
+                        "Jack p: ",
+                        jack_p,
+                        "overall: ",
+                        f"{overall_significant} / {overall_valid}",
+                    )
                 # train.report(
                 #     {"recall": overall_significant, "jack": jack_p},
                 # )
@@ -447,35 +448,39 @@ class Trainer:
         predictions = predictions[:, 0:8]
 
         # Perform Statistic Method
-        sts = Permutate(
-            config=self.config,
-            phase=phase,
-            epoch=epoch,
-            phase_length=predictions_length,
-        )
-        """method John"""
-        # print('***** METHOD JOHN *****')
-        # sts.method_john1(predictions)
+        if not self.config.experiment["use_sleep"]:
+            sts = Permutate(
+                config=self.config,
+                phase=phase,
+                epoch=epoch,
+                phase_length=predictions_length,
+            )
+            """method John"""
+            # print('***** METHOD JOHN *****')
+            # sts.method_john1(predictions)
 
-        # """method John2"""
-        # print('***** METHOD JOHN 2*****')
-        # sts.method_john2(predictions)
+            # """method John2"""
+            # print('***** METHOD JOHN 2*****')
+            # sts.method_john2(predictions)
 
-        """method Soraya"""
-        # print('***** METHOD SORAYA *****')
-        stats = sts.method_soraya(smoothed_data)
+            """method Soraya"""
+            # print('***** METHOD SORAYA *****')
+            stats = sts.method_soraya(smoothed_data)
 
-        """curve shape"""
-        sts.method_curve_shape(smoothed_data)
+            """curve shape"""
+            sts.method_curve_shape(smoothed_data)
 
-        """method hoteling"""
-        # print('***** METHOD HOTEL *****')
-        # sts.method_hotel()
+            """method hoteling"""
+            # print('***** METHOD HOTEL *****')
+            # sts.method_hotel()
 
-        """plot p value curve"""
-        # print('***** METHOD 4-6-8 *****')
-        sts.method_pvalue_curve(predictions)
-        # if epoch == self.config['epochs']:
-        #     """plot p value curve"""
-        #     sts.method_pvalue_curve(predictions)
+            """plot p value curve"""
+            # print('***** METHOD 4-6-8 *****')
+            sts.method_pvalue_curve(predictions)
+            # if epoch == self.config['epochs']:
+            #     """plot p value curve"""
+            #     sts.method_pvalue_curve(predictions)
+        else:
+            stats = None
+
         return stats
