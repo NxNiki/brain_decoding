@@ -8,41 +8,29 @@ from pydantic import BaseModel, Field
 
 class BaseConfig(BaseModel):
     alias: Dict[str, str] = {}
-    param: Dict[str, Any] = {}
+
+    class Config:
+        extra = "allow"  # Allow arbitrary attributes
 
     def __getitem__(self, key: str) -> Any:
-        if key in self.param:
-            return self.param[key]
         return getattr(self, key)
 
     def __setitem__(self, key: str, value: Any):
-        if key in self.model_fields:
-            setattr(self, key, value)
-        else:
-            self.param[key] = value
+        setattr(self, key, value)
 
     def __getattr__(self, name):
         """Handles alias access and custom parameters."""
         if name in self.alias:
             return getattr(self, self.alias[name])
-        if name in self.param:
-            return self.param[name]
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
     def __setattr__(self, name, value):
         """Handles alias assignment, field setting, or adding to _param."""
         if name in self.alias:
             name = self.alias[name]
-
-        # Check if it's a field defined in the model
-        if name in self.model_fields:
-            super().__setattr__(name, value)
-        else:
-            # Otherwise, treat it as a custom parameter
-            self.param[name] = value
+        super().__setattr__(name, value)
 
     def __contains__(self, key: str) -> bool:
-        return key in self.param or hasattr(self, key)
+        return hasattr(self, key)
 
 
 class ExperimentConfig(BaseConfig):
