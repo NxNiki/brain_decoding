@@ -34,7 +34,9 @@ if __name__ == "__main__":
     config.experiment.use_combined = False
     config.experiment.use_shuffle = True
     config.experiment.use_bipolar = False
-    config.experiment.use_sleep = True  # set true to use sleep data as inference dataset, otherwise use free recall
+    config.experiment.use_sleep = (
+        True  # set true to use sleep data as inference dataset, otherwise use free recall, is this right?
+    )
     config.experiment.use_overlap = False
     config.experiment.use_long_input = False
     config.experiment.use_spontaneous = False
@@ -42,6 +44,8 @@ if __name__ == "__main__":
     config.experiment.use_shuffle_diagnostic = True
     config.experiment.testing_mode = True  # in testing mode, a maximum of 1e4 clusterless data will be loaded.
     config.experiment.model_aggregate_type = "sum"
+    config.experiment.train_phase = ["movie_1"]
+    config.experiment.test_phase = ["sleep_2"]
 
     config.data.result_path = str(RESULT_PATH)
     config.data.spike_path = str(DATA_PATH)
