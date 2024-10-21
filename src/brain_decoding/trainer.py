@@ -71,7 +71,6 @@ class Trainer:
         best_f1 = -1
         self.model.train()
         os.makedirs(self.config.data["train_save_path"], exist_ok=True)
-        os.makedirs(self.config.data["train_save_path"], exist_ok=True)
         for epoch in tqdm(range(epochs)):
             meter = Meter(fold)
 
@@ -145,19 +144,20 @@ class Trainer:
                 )
                 print()
                 print("WELCOME MEMORY TEST at: ", epoch)
-                stats_m = self.memory(epoch=epoch + 1, phase="free_recall1", alongwith=[])
+                stats_m = self.memory(epoch=epoch + 1, phase=self.config.data.phases[0], alongwith=[])
                 # self.memory(1, epoch=epoch+1, phase='all')
-                overall_p = list(stats_m.values())
-                print("P: ", overall_p)
-                overall_significant = len([x for x in overall_p if not np.isnan(x) and 0 <= x < 0.1])
-                overall_valid = len([x for x in overall_p if not np.isnan(x)])
-                jack_p = stats_m["Jack"]
-                print(
-                    "Jack p: ",
-                    jack_p,
-                    "overall: ",
-                    f"{overall_significant} / {overall_valid}",
-                )
+                if stats_m is not None:
+                    overall_p = list(stats_m.values())
+                    print("P: ", overall_p)
+                    overall_significant = len([x for x in overall_p if not np.isnan(x) and 0 <= x < 0.1])
+                    overall_valid = len([x for x in overall_p if not np.isnan(x)])
+                    jack_p = stats_m["Jack"]
+                    print(
+                        "Jack p: ",
+                        jack_p,
+                        "overall: ",
+                        f"{overall_significant} / {overall_valid}",
+                    )
                 # train.report(
                 #     {"recall": overall_significant, "jack": jack_p},
                 # )
@@ -380,8 +380,8 @@ class Trainer:
         predictions_all = np.empty((0, self.config.model["num_labels"]))
         predictions_length = {}
         with torch.no_grad():
-            self.config.experiment["free_recall_phase"] = phase
-            dataloaders = initialize_inference_dataloaders(self.config)
+            # self.config.experiment["free_recall_phase"] = phase
+            # dataloaders = initialize_inference_dataloaders(self.config)
             predictions = np.empty((0, self.config.model["num_labels"]))
             # y_true = np.empty((0, self.config['num_labels']))
             for i, (feature, index) in enumerate(dataloaders["inference"]):
@@ -408,13 +408,13 @@ class Trainer:
         save_path = os.path.join(self.config.data["memory_save_path"], "prediction")
         os.makedirs(save_path, exist_ok=True)
         np.save(
-            os.path.join(save_path, "epoch{}_free_recall_{}_results.npy".format(epoch, phase)),
+            os.path.join(save_path, "epoch{}_test_{}_results.npy".format(epoch, phase)),
             predictions_all,
         )
 
         for ph in alongwith:
             self.config.experiment["free_recall_phase"] = ph
-            dataloaders = initialize_inference_dataloaders(self.config)
+            # dataloaders = initialize_inference_dataloaders(self.config)
             with torch.no_grad():
                 # load the best epoch number from the saved "model_results" structure
                 predictions = np.empty((0, self.config.model["num_labels"]))
@@ -448,35 +448,39 @@ class Trainer:
         predictions = predictions[:, 0:8]
 
         # Perform Statistic Method
-        sts = Permutate(
-            config=self.config,
-            phase=phase,
-            epoch=epoch,
-            phase_length=predictions_length,
-        )
-        """method John"""
-        # print('***** METHOD JOHN *****')
-        # sts.method_john1(predictions)
+        if not self.config.experiment["use_sleep"]:
+            sts = Permutate(
+                config=self.config,
+                phase=phase,
+                epoch=epoch,
+                phase_length=predictions_length,
+            )
+            """method John"""
+            # print('***** METHOD JOHN *****')
+            # sts.method_john1(predictions)
 
-        # """method John2"""
-        # print('***** METHOD JOHN 2*****')
-        # sts.method_john2(predictions)
+            # """method John2"""
+            # print('***** METHOD JOHN 2*****')
+            # sts.method_john2(predictions)
 
-        """method Soraya"""
-        # print('***** METHOD SORAYA *****')
-        stats = sts.method_soraya(smoothed_data)
+            """method Soraya"""
+            # print('***** METHOD SORAYA *****')
+            stats = sts.method_soraya(smoothed_data)
 
-        """curve shape"""
-        sts.method_curve_shape(smoothed_data)
+            """curve shape"""
+            sts.method_curve_shape(smoothed_data)
 
-        """method hoteling"""
-        # print('***** METHOD HOTEL *****')
-        # sts.method_hotel()
+            """method hoteling"""
+            # print('***** METHOD HOTEL *****')
+            # sts.method_hotel()
 
-        """plot p value curve"""
-        # print('***** METHOD 4-6-8 *****')
-        sts.method_pvalue_curve(predictions)
-        # if epoch == self.config['epochs']:
-        #     """plot p value curve"""
-        #     sts.method_pvalue_curve(predictions)
+            """plot p value curve"""
+            # print('***** METHOD 4-6-8 *****')
+            sts.method_pvalue_curve(predictions)
+            # if epoch == self.config['epochs']:
+            #     """plot p value curve"""
+            #     sts.method_pvalue_curve(predictions)
+        else:
+            stats = None
+
         return stats

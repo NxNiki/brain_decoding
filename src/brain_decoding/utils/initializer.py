@@ -3,8 +3,8 @@ from typing import Dict
 from transformers import ViTConfig, Wav2Vec2Config
 
 from brain_decoding.config.config import DataConfig, PipelineConfig
-from brain_decoding.dataloader.free_recall import InferenceDataset, create_inference_combined_loaders
-from brain_decoding.dataloader.movie import NeuronDataset, create_weighted_loaders
+from brain_decoding.dataloader.test_data import InferenceDataset, create_inference_combined_loaders
+from brain_decoding.dataloader.train_data import NeuronDataset, create_weighted_loaders
 from brain_decoding.models.ensemble import Ensemble
 from brain_decoding.models.multichannel_encoder_vit import MultiEncoder as MultiEncoderViT
 from brain_decoding.models.multichannel_encoder_vit_sum import MultiEncoder as MultiEncoderViTSum
@@ -60,16 +60,17 @@ def initialize_configs(architecture) -> Dict:
 
 def initialize_inference_dataloaders(config: PipelineConfig):
     if config.experiment["use_sleep"]:
-        dataset = InferenceDataset(
-            config.data["data_path"],
-            config.experiment["patient"],
-            config.experiment["use_lfp"],
-            config.experiment["use_spike"],
-            config.experiment["use_bipolar"],
-            config.experiment["use_sleep"],
-            config.experiment["free_recall_phase"],
-            config.experiment["hour"],
-        )
+        dataset = InferenceDataset(config)
+        # dataset = InferenceDataset(
+        #     config.data["data_path"],
+        #     config.experiment["patient"],
+        #     config.experiment["use_lfp"],
+        #     config.experiment["use_spike"],
+        #     config.experiment["use_bipolar"],
+        #     config.experiment["use_sleep"],
+        #     config.experiment["free_recall_phase"],
+        #     config.experiment["hour"],
+        # )
     else:
         dataset = InferenceDataset(config)
 

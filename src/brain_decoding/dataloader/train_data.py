@@ -5,7 +5,7 @@ import pickle
 import random
 import re
 from collections import defaultdict
-from typing import List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -58,10 +58,6 @@ class NeuronDataset:
         self.smoothed_label = []
         self.lfp_channel_by_region = {}
 
-        def sort_filename(filename):
-            """Extract the numeric part of the filename and use it as the sort key"""
-            return [int(x) if x.isdigit() else x for x in re.findall(r"\d+|\D+", filename)]
-
         if self.patient in ["564", "565"]:
             categories = ["Movie_1", "Movie_2"]
         else:
@@ -73,74 +69,11 @@ class NeuronDataset:
 
         # create spike data
         if self.use_spike:
-            sample_size = []
-            spike_data = []
-            for c, category in enumerate(categories):
-                version = self.spike_data_mode
-                for sd in self.spike_data_sd:
-                    spike_path = os.path.join(
-                        config.data["spike_path"],
-                        str(self.patient),
-                        version,
-                        "time_{}".format(category.lower()),
-                    )
-                    spike_files = glob.glob(os.path.join(spike_path, "*.npz"))
-                    spike_files = sorted(spike_files, key=sort_filename)
-                    spike_data.append(self.load_clustless(spike_files, sd))
-                    sample_size.append(spike_data[-1].shape[0])
-
-            # if self.patient == '564':
-            #     min_length = min(arr.shape[0] for arr in self.spike_data)
-            #     self.spike_data = [arr[:min_length] for arr in self.spike_data]
-            #     self.label = [arr[:min_length] for arr in self.label]
-            #     self.smoothed_label = [arr[:min_length] for arr in self.smoothed_label]
-            self.data["clusterless"] = np.concatenate(spike_data, axis=0)
+            self.data["clusterless"] = self.load_data(config.data["spike_path"], categories)
 
         # create lfp data
         if self.use_lfp:
-            sample_size = []
-            lfp_data = []
-
-            for c, category in enumerate(categories):
-                version = self.lfp_data_mode
-                # value = self.lfp_data.setdefault(version, [])
-                lfp_path = os.path.join(
-                    config.data["lfp_path"],
-                    self.patient,
-                    version,
-                    "spectrogram_{}".format(category.lower()),
-                )
-                lfp_files = glob.glob(os.path.join(lfp_path, "*.npz"))
-                lfp_files = sorted(lfp_files, key=sort_filename)
-                lfp_data.append(self.load_lfp(lfp_files))
-                sample_size.append(lfp_data[-1].shape[0])
-
-            # if self.use_spontaneous:
-            #     target_length = 12800 - 9740
-            #     num_c1, num_c2 = len(self.label[1]), len(self.label[2])
-            #     total_length = num_c1 + num_c2
-            #     ratio_c1 = num_c1 / total_length
-            #     new_num_c1 = int(target_length * ratio_c1)
-            #     new_num_c2 = target_length - new_num_c1
-
-            #     indices_c1 = np.random.choice(num_c1, new_num_c1, replace=False)
-            #     indices_c2 = np.random.choice(num_c2, new_num_c2, replace=False)
-            #     indices_c1 = np.sort(indices_c1)
-            #     indices_c2 = np.sort(indices_c2)
-
-            #     # self.lfp_data[self.lfp_data_mode][1] = self.lfp_data[self.lfp_data_mode][1][indices_c1]
-            #     # self.lfp_data[self.lfp_data_mode][2] = self.lfp_data[self.lfp_data_mode][2][indices_c2]
-            #     self.lfp_data[1] = self.lfp_data[1][indices_c1]
-            #     self.lfp_data[2] = self.lfp_data[2][indices_c2]
-
-            #     self.label[1] = self.label[1][indices_c1]
-            #     self.label[2] = self.label[2][indices_c2]
-
-            #     self.smoothed_label[1] = self.smoothed_label[1][indices_c1]
-            #     self.smoothed_label[2] = self.smoothed_label[2][indices_c2]
-
-            # self.lfp_data = {key: np.concatenate(value_list, axis=0) for key, value_list in self.lfp_data.items()}
-            self.data["lfp"] = np.concatenate(lfp_data, axis=0)
+            self.data["lfp"] = self.load_data(config.data["lfp_path"], categories)
 
         # for c, category in enumerate(categories):
         #     size = sample_size[c]
@@ -152,7 +85,7 @@ class NeuronDataset:
         #         self.smoothed_label.append(self.smoothed_ml_label.transpose().astype(np.float32))
 
         for c, category in enumerate(self.spike_data_sd):
-            size = sample_size[c]
+            # size = sample_size[c]
             self.label.append(self.ml_label.transpose().astype(np.float32))
             self.smoothed_label.append(self.smoothed_ml_label.transpose().astype(np.float32))
 
@@ -162,7 +95,7 @@ class NeuronDataset:
         if self.use_overlap:
             self.label = self.label[1:-1]
             self.smoothed_label = self.smoothed_label[1:-1]
-        # filter low occuracne sampels
+        # filter low occurrence samples
         class_value, class_count = np.unique(self.label[:, 0:8], axis=0, return_counts=True)
         occurrence_threshold = 200 * len(self.spike_data_sd)
         good_indices = np.where(class_count >= occurrence_threshold)[0]
@@ -183,6 +116,55 @@ class NeuronDataset:
         if config.experiment["use_shuffle_diagnostic"]:
             # self.brute_shuffle()
             self.circular_shift()
+
+    def load_data(self, data_path: str, categories: List[str]) -> np.ndarray[Any]:
+        sample_size = []
+        spike_data = []
+        for c, category in enumerate(categories):
+            version = self.spike_data_mode
+            for sd in self.spike_data_sd:
+                spike_path = os.path.join(
+                    data_path,
+                    str(self.patient),
+                    version,
+                    "time_{}".format(category.lower()),
+                )
+                spike_files = glob.glob(os.path.join(spike_path, "*.npz"))
+                spike_files = sorted(spike_files, key=sort_file_name)
+                spike_data.append(self.load_clustless(spike_files, sd))
+                sample_size.append(spike_data[-1].shape[0])
+
+        # if self.patient == '564':
+        #     min_length = min(arr.shape[0] for arr in self.spike_data)
+        #     self.spike_data = [arr[:min_length] for arr in self.spike_data]
+        #     self.label = [arr[:min_length] for arr in self.label]
+        #     self.smoothed_label = [arr[:min_length] for arr in self.smoothed_label]
+
+        # if self.use_spontaneous:
+        #     target_length = 12800 - 9740
+        #     num_c1, num_c2 = len(self.label[1]), len(self.label[2])
+        #     total_length = num_c1 + num_c2
+        #     ratio_c1 = num_c1 / total_length
+        #     new_num_c1 = int(target_length * ratio_c1)
+        #     new_num_c2 = target_length - new_num_c1
+
+        #     indices_c1 = np.random.choice(num_c1, new_num_c1, replace=False)
+        #     indices_c2 = np.random.choice(num_c2, new_num_c2, replace=False)
+        #     indices_c1 = np.sort(indices_c1)
+        #     indices_c2 = np.sort(indices_c2)
+
+        #     # self.lfp_data[self.lfp_data_mode][1] = self.lfp_data[self.lfp_data_mode][1][indices_c1]
+        #     # self.lfp_data[self.lfp_data_mode][2] = self.lfp_data[self.lfp_data_mode][2][indices_c2]
+        #     self.lfp_data[1] = self.lfp_data[1][indices_c1]
+        #     self.lfp_data[2] = self.lfp_data[2][indices_c2]
+
+        #     self.label[1] = self.label[1][indices_c1]
+        #     self.label[2] = self.label[2][indices_c2]
+
+        #     self.smoothed_label[1] = self.smoothed_label[1][indices_c1]
+        #     self.smoothed_label[2] = self.smoothed_label[2][indices_c2]
+
+        return np.concatenate(spike_data, axis=0)
 
     def smooth_label(self):
         sigma = 1
@@ -377,16 +359,20 @@ class MyDataset(Dataset):
         return (lfp, spike), label, idx
 
 
+def sort_file_name(filenames: List[str]) -> List[Union[int, str]]:
+    """Extract the numeric part of the filename and use it as the sort key"""
+    return [int(x) if x.isdigit() else x for x in re.findall(r"\d+|\D+", filenames)]
+
+
 def create_weighted_loaders(
-    dataset,
+    dataset: NeuronDataset,
     config: PipelineConfig,
-    batch_size=128,
-    seed=42,
-    p_val=0.1,
-    batch_sample_num=2048,
-    shuffle=True,
-    transform=None,
-    extras={},
+    batch_size: int = 128,
+    seed: int = 42,
+    p_val: float = 0.1,
+    batch_sample_num: int = 2048,
+    shuffle: bool = True,
+    transform: bool = None,
 ):
     # assert 0 < p_val < 1.0, 'p_val must be greater than 0 and smaller than 1'
     if p_val > 0:

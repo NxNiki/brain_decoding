@@ -10,8 +10,7 @@ import pandas as pd
 
 from brain_decoding.config.config import PipelineConfig
 from brain_decoding.config.file_path import PATIENTS_FILE_PATH, SURROGATE_FILE_PATH
-from brain_decoding.dataloader.load_patients import load_patients
-from brain_decoding.dataloader.patients import Experiment
+from brain_decoding.dataloader.patients import Experiment, load_patients
 from brain_decoding.param.param_data import LABELS
 from brain_decoding.utils.check_free_recall import (
     find_area_above_threshold_yyding,
@@ -261,14 +260,13 @@ class Permutate:
         pass
 
     def method_pvalue_curve(self, predictions):
-        activations = predictions
         bins_back = np.arange(-16, 1)
         activations_width = [4, 6, 8]
 
         start_time = time.time()
         with multiprocessing.Pool(processes=4) as pool:
             args_list = [
-                (activations, self.recall_windows, bb, aw, self.cr_bins) for aw in activations_width for bb in bins_back
+                (predictions, self.recall_windows, bb, aw, self.cr_bins) for aw in activations_width for bb in bins_back
             ]
             results = pool.starmap(get_empirical_concept_ps_yyding, args_list)
         end_time = time.time()
@@ -324,19 +322,20 @@ class Permutate:
         fig, ax = plt.subplots(figsize=(4, 8))
         heatmap = ax.imshow(predictions, cmap="viridis", aspect="auto", interpolation="none")
 
-        for concept_i, concept_vocalizations in enumerate(self.recall_windows):
-            if not len(concept_vocalizations) > 0:
-                continue
-            for concept_vocalization in concept_vocalizations:
-                t = 4 * concept_vocalization / 1000
-                ax.axhline(
-                    y=t,
-                    color="red",
-                    linestyle="-",
-                    alpha=0.6,
-                    xmin=concept_i / len(LABELS),
-                    xmax=(concept_i + 1) / len(LABELS),
-                )
+        if not self.config.experiment["use_sleep"]:
+            for concept_i, concept_vocalizations in enumerate(self.recall_windows):
+                if not len(concept_vocalizations) > 0:
+                    continue
+                for concept_vocalization in concept_vocalizations:
+                    t = 4 * concept_vocalization / 1000
+                    ax.axhline(
+                        y=t,
+                        color="red",
+                        linestyle="-",
+                        alpha=0.6,
+                        xmin=concept_i / len(LABELS),
+                        xmax=(concept_i + 1) / len(LABELS),
+                    )
 
         cbar = plt.colorbar(heatmap)
         cbar.ax.tick_params(labelsize=10)

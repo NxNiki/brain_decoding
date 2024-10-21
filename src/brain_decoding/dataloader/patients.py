@@ -1,6 +1,6 @@
 import json
 import warnings
-from copy import deepcopy
+from copy import deepcopy, error
 from logging import warning
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Union
@@ -59,6 +59,9 @@ class Events(BaseModel):
             warnings.warn(f"overwrite existing item: {item}")
         self.events[item] = event
 
+    def __len__(self) -> int:
+        return len(self.events.keys())
+
     def extend_events(self, other: "Events") -> None:
         events_name = set(self.events.keys() | other.events.keys())
         events_name_common = set(self.events.keys() & other.events.keys())
@@ -70,7 +73,8 @@ class Events(BaseModel):
 
     def add_event(self, label: str, values: Optional[List[int]] = None, description: Optional[str] = None):
         if self.has_event(label):
-            raise KeyError(f"Event {label} already exists in the shared events!")
+            error_msg = f"Event {label} already exists in the shared events!"
+            raise KeyError(error_msg)
         self.events[label] = Event(values=values, description=description)
 
     def get_event(self, label: str) -> Event:
@@ -156,7 +160,8 @@ class Patient(BaseModel):
 
     def __getitem__(self, experiment_name: str) -> Optional[Experiment]:
         if not self.has_experiment(experiment_name):
-            raise KeyError(f"experiment: {experiment_name} not exist!")
+            error_msg = f"experiment: {experiment_name} not exist!"
+            raise KeyError(error_msg)
         return self.experiments[experiment_name]
 
     def __setitem__(self, experiment_name: str, experiment: Experiment):
@@ -174,7 +179,8 @@ class Patient(BaseModel):
 
     def add_event(self, experiment_name: str, event_name: str, values: List[int]):
         if experiment_name not in self.experiments:
-            raise KeyError(f"experiment: {experiment_name} not exist!")
+            error_msg = f"experiment: {experiment_name} not exist!"
+            raise KeyError(error_msg)
         self.experiments[experiment_name].events.add_event(event_name, values)
 
     def add_events(self, experiment_name: str, events: Events):
@@ -218,7 +224,8 @@ class Patients(BaseModel):
 
     def __getitem__(self, patient_id: str) -> Optional[Patient]:
         if patient_id not in self.patients:
-            raise KeyError(f"Patient: {patient_id} does not exist!")
+            error_msg = f"Patient: {patient_id} does not exist!"
+            raise KeyError(error_msg)
         return self.patients[patient_id]
 
     def __setitem__(self, patient_id: str):
@@ -302,6 +309,19 @@ class Patients(BaseModel):
         print(f"Patients.read_json: patient_id: {patient_id}")
         print(f"Patients.read_json: read patient file: \n{file_name}")
         self.patients[patient_id] = Patient.model_validate_json(open(file_name).read())
+
+
+def load_patients(patients_id: Union[str, List[str]], file_path: Path) -> Patients:
+    patients = Patients()
+
+    if isinstance(patients_id, str):
+        patients_id = [patients_id]
+
+    for patient_id in patients_id:
+        patient_file = file_path / f"patient_{patient_id}.json"
+        patients.read_json(patient_file, patient_id)
+
+    return patients
 
 
 # Example usage within the module (can be removed or commented out for production use)

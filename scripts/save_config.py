@@ -7,16 +7,16 @@ from brain_decoding.config.config import ExperimentConfig, PipelineConfig
 from brain_decoding.config.file_path import CONFIG_FILE_PATH, DATA_PATH, RESULT_PATH
 
 if __name__ == "__main__":
-    experiment_config = ExperimentConfig(name="test", patient=562)
+    experiment_config = ExperimentConfig(name="sleep", patient=562)
 
     config = PipelineConfig(experiment=experiment_config)
     config.model.architecture = "multi-vit"
     config.model.learning_rate = 1e-4
     config.model.batch_size = 128
     config.model.weight_decay = 1e-4
-    config.model.epochs = 5
+    config.model.epochs = 40
     config.model.lr_drop = 50
-    config.model.validation_step = 2
+    config.model.validation_step = 10
     config.model.early_stop = 75
     config.model.num_labels = 8
     config.model.merge_label = True
@@ -34,13 +34,18 @@ if __name__ == "__main__":
     config.experiment.use_combined = False
     config.experiment.use_shuffle = True
     config.experiment.use_bipolar = False
-    config.experiment.use_sleep = False
+    config.experiment.use_sleep = (
+        True  # set true to use sleep data as inference dataset, otherwise use free recall, is this right?
+    )
     config.experiment.use_overlap = False
     config.experiment.use_long_input = False
     config.experiment.use_spontaneous = False
     config.experiment.use_augment = False
     config.experiment.use_shuffle_diagnostic = True
+    config.experiment.testing_mode = True  # in testing mode, a maximum of 1e4 clusterless data will be loaded.
     config.experiment.model_aggregate_type = "sum"
+    config.experiment.train_phase = ["movie_1"]
+    config.experiment.test_phase = ["sleep_2"]
 
     config.data.result_path = str(RESULT_PATH)
     config.data.spike_path = str(DATA_PATH)
@@ -50,9 +55,6 @@ if __name__ == "__main__":
     config.data.spike_data_mode_inference = "notch CAR-quant-neg"
     config.data.spike_data_sd = [3.5]
     config.data.spike_data_sd_inference = 3.5
-    config.data.use_augment = False
-    config.data.use_long_input = False
-    config.data.use_shuffle_diagnostic = False
     config.data.model_aggregate_type = "sum"
     config.data.movie_label_path = str(DATA_PATH / "8concepts_merged.npy")
     config.data.movie_sampling_rate = 30

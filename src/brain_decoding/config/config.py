@@ -1,48 +1,51 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import yaml
 from pydantic import BaseModel, Field
 
 
 class BaseConfig(BaseModel):
-    alias: Dict[str, str] = {}
-    param: Dict[str, Any] = {}
+    class Config:
+        extra = "allow"  # Allow arbitrary attributes
+
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
+        self.__dict__["_list_fields"]: Set[str] = set()
+        self.__dict__["_alias"]: Dict[str, str] = {}
 
     def __getitem__(self, key: str) -> Any:
-        if key in self.param:
-            return self.param[key]
         return getattr(self, key)
 
     def __setitem__(self, key: str, value: Any):
-        if key in self.model_fields:
-            setattr(self, key, value)
-        else:
-            self.param[key] = value
+        setattr(self, key, value)
 
     def __getattr__(self, name):
         """Handles alias access and custom parameters."""
-        if name in self.alias:
-            return getattr(self, self.alias[name])
-        if name in self.param:
-            return self.param[name]
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        if name in self._alias:
+            return getattr(self, self._alias[name])
 
     def __setattr__(self, name, value):
         """Handles alias assignment, field setting, or adding to _param."""
-        if name in self.alias:
-            name = self.alias[name]
-
-        # Check if it's a field defined in the model
-        if name in self.model_fields:
-            super().__setattr__(name, value)
-        else:
-            # Otherwise, treat it as a custom parameter
-            self.param[name] = value
+        if name in self._alias:
+            name = self._alias[name]
+        if name in self._list_fields and not isinstance(value, list):
+            value = [value]
+        super().__setattr__(name, value)
 
     def __contains__(self, key: str) -> bool:
-        return key in self.param or hasattr(self, key)
+        return hasattr(self, key)
+
+    def set_alias(self, name: str, alias: str) -> None:
+        self.__dict__["_alias"][alias] = name
+
+    def ensure_list(self, name: str):
+        value = getattr(self, name, None)
+        if value is not None and not isinstance(value, list):
+            setattr(self, name, [value])
+        # Mark the field to always be treated as a list
+        self._list_fields.add(name)
 
 
 class ExperimentConfig(BaseConfig):
@@ -65,10 +68,12 @@ class ModelConfig(BaseConfig):
     num_attention_heads: Optional[int] = 6
     patch_size: Optional[Tuple[int, int]] = None
 
-    alias: Dict[str, str] = {
-        "lr": "learning_rate",
-        "lr_drop": "learning_rate_drop",
-    }
+    def __init__(self, **data: Any):
+        super().__init__(**data)
+        self._alias: Dict[str, str] = {
+            "lr": "learning_rate",
+            "lr_drop": "learning_rate_drop",
+        }
 
 
 class DataConfig(BaseConfig):
@@ -134,6 +139,11 @@ if __name__ == "__main__":
     print(f"Learning Rate (alias 'lr'): {pipeline_config.model['lr']}")
     print(f"Learning Rate (alias 'lr'): {pipeline_config.model.lr}")
 
+    # set alias
+    pipeline_config.data["original_name"] = "original_name"
+    pipeline_config.data.set_alias("original_name", "alias_name")
+    print(f"original_name (from alias_name): {pipeline_config.data.alias_name}")
+
     # Set new custom parameters
     pipeline_config.model["new_param"] = "custom_value"
     print(f"Custom Parameter 'new_param': {pipeline_config.model['new_param']}")
@@ -141,10 +151,14 @@ if __name__ == "__main__":
     print(f"Custom Parameter 'new_param2': {pipeline_config.model.new_param2}")
 
     # Try to access a non-existent field (will raise AttributeError)
-    try:
-        print(pipeline_config.model.some_non_existent_field)
-    except AttributeError as e:
-        print(e)
+    print(f"non_exist_field: {pipeline_config.model.some_non_existent_field}")
+
+    # test ensure list:
+    pipeline_config.model["a_list"] = 1
+    pipeline_config.model.ensure_list("a_list")
+    print(f"ensure_list: {pipeline_config.model.a_list}")
+    pipeline_config.model["a_list"] = 1
+    print(f"ensure_list: {pipeline_config.model.a_list}")
 
     # Export config:
     pipeline_config.export_config()
