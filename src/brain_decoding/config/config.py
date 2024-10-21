@@ -37,6 +37,11 @@ class BaseConfig(BaseModel):
     def __contains__(self, key: str) -> bool:
         return hasattr(self, key)
 
+    def __repr__(self):
+        attrs = {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
+        attr_str = "\n".join(f"    {key}: {value!r}" for key, value in attrs.items())
+        return f"{self.__class__.__name__}(\n{attr_str}\n)"
+
     def set_alias(self, name: str, alias: str) -> None:
         self.__dict__["_alias"][alias] = name
 
