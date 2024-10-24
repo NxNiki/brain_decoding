@@ -144,8 +144,8 @@ class Trainer:
                 )
                 print()
                 print("WELCOME MEMORY TEST at: ", epoch)
-                stats_m = self.memory(epoch=epoch + 1, phase=self.config.data.phases[0], alongwith=[])
-                # self.memory(1, epoch=epoch+1, phase='all')
+                stats_m = self.memory(epoch=epoch + 1, phase=self.config.experiment.test_phases[0], alongwith=[])
+
                 if stats_m is not None:
                     overall_p = list(stats_m.values())
                     print("P: ", overall_p)
@@ -360,7 +360,7 @@ class Trainer:
         torch.manual_seed(self.config.experiment["seed"])
         np.random.seed(self.config.experiment["seed"])
         random.seed(self.config.experiment["seed"])
-        self.config.experiment["free_recall_phase"] = phase
+        # self.config.experiment["test_phase"] = phase
         dataloaders = initialize_inference_dataloaders(self.config)
         model = initialize_model(self.config)
         # model = torch.compile(model)
@@ -448,7 +448,7 @@ class Trainer:
         predictions = predictions[:, 0:8]
 
         # Perform Statistic Method
-        if not self.config.experiment["use_sleep"]:
+        if self.config.experiment["compute_accuracy"]:
             sts = Permutate(
                 config=self.config,
                 phase=phase,

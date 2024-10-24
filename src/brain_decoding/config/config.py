@@ -37,14 +37,19 @@ class BaseConfig(BaseModel):
     def __contains__(self, key: str) -> bool:
         return hasattr(self, key)
 
+    def __repr__(self):
+        attrs = {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
+        attr_str = "\n".join(f"    {key}: {value!r}" for key, value in attrs.items())
+        return f"{self.__class__.__name__}(\n{attr_str}\n)"
+
     def set_alias(self, name: str, alias: str) -> None:
         self.__dict__["_alias"][alias] = name
 
     def ensure_list(self, name: str):
+        """Mark the field to always be treated as a list"""
         value = getattr(self, name, None)
         if value is not None and not isinstance(value, list):
             setattr(self, name, [value])
-        # Mark the field to always be treated as a list
         self._list_fields.add(name)
 
 
@@ -112,8 +117,9 @@ class PipelineConfig(BaseModel):
         dir_path = output_file.parent
         dir_path.mkdir(parents=True, exist_ok=True)
 
+        config_data = self.model_dump()
         with open(output_file, "w") as file:
-            yaml.safe_dump(self.model_dump(), file)
+            yaml.safe_dump(config_data, file)
 
     @property
     def _file_tag(self) -> str:

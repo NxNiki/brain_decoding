@@ -27,56 +27,23 @@ class InferenceDataset(Dataset):
     def __init__(self, config):
         self.config = config
         self.lfp_channel_by_region = {}
-        phases = config.data.phases
+
         spikes_data = None
         if self.config.experiment["use_spike"]:
             data_path = "spike_path"
-            if self.config.experiment["use_sleep"]:
-                config.experiment["spike_data_mode_inference"] = ""
-                spikes_data = self.read_recording_data(data_path, "time_sleep", phases[0])
-            else:
-                if (
-                    isinstance(self.config.experiment["free_recall_phase"], str)
-                    and "all" in self.config.experiment["free_recall_phase"]
-                ):
-                    for phase in phases:
-                        spikes_data = self.read_recording_data(data_path, "time_recall", phase)
-                elif (
-                    isinstance(self.config.experiment["free_recall_phase"], str)
-                    and "control" in self.config.experiment["free_recall_phase"]
-                ):
-                    spikes_data = self.read_recording_data(data_path, "time", None)
-                elif (
-                    isinstance(self.config.experiment["free_recall_phase"], str)
-                    and "movie" in self.config.experiment["free_recall_phase"]
-                ):
-                    spikes_data = self.read_recording_data(data_path, "time", None)
-                else:
-                    spikes_data = self.read_recording_data(data_path, "time_recall", None)
+            spikes_data = self.read_recording_data(data_path, "time", self.config.experiment.test_phases[0])
 
         lfp_data = None
         if self.config.experiment["use_lfp"]:
             data_path = "lfp_path"
-            if self.config.experiment.use_sleep:
-                config["spike_data_mode_inference"] = ""
-                lfp_data = self.read_recording_data(data_path, "spectrogram_sleep", "")
-            else:
-                if isinstance(self.config["free_recall_phase"], str) and "all" in self.config["free_recall_phase"]:
-                    for phase in phases:
-                        lfp_data = self.read_recording_data(data_path, "spectrogram_recall", phase)
-                elif (
-                    isinstance(self.config["free_recall_phase"], str) and "control" in self.config["free_recall_phase"]
-                ):
-                    lfp_data = self.read_recording_data(data_path, "spectrogram", None)
-                else:
-                    lfp_data = self.read_recording_data(data_path, "spectrogram_recall", None)
+            lfp_data = self.read_recording_data(data_path, "spectrogram_recall", self.config.experiment.test_phases[0])
             # self.lfp_data = {key: np.concatenate(value_list, axis=0) for key, value_list in self.lfp_data.items()}
 
         self.data = {"clusterless": spikes_data, "lfp": lfp_data}
         self.data_length = self.get_data_length()
         self.preprocess_data()
 
-    def read_recording_data(self, root_path: str, file_path_prefix: str, phase: Optional[str]) -> np.ndarray[float]:
+    def read_recording_data(self, root_path: str, file_path_prefix: str, phase: str) -> np.ndarray[float]:
         """
         read spike or lfp data.
 
@@ -85,10 +52,7 @@ class InferenceDataset(Dataset):
         :param phase:
         :return:
         """
-        if phase == "":
-            exp_file_path = file_path_prefix
-        else:
-            exp_file_path = f"{file_path_prefix}_{phase}"
+        exp_file_path = f"{file_path_prefix}_{phase}"
 
         recording_file_path = os.path.join(
             self.config.data[root_path],
@@ -100,7 +64,8 @@ class InferenceDataset(Dataset):
         recording_files = sorted(recording_files, key=sort_file_name)
 
         if not recording_files:
-            raise ValueError(f"not files found in: {recording_files}")
+            error_msg = f"not files found in: {recording_files}"
+            raise ValueError(error_msg)
 
         if root_path == "spike_path":
             data = self.load_clustless(recording_files)

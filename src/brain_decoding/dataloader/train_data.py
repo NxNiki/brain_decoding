@@ -58,22 +58,13 @@ class NeuronDataset:
         self.smoothed_label = []
         self.lfp_channel_by_region = {}
 
-        if self.patient in ["564", "565"]:
-            categories = ["Movie_1", "Movie_2"]
-        else:
-            categories = ["Movie_1"]
-
-        if self.use_spontaneous:
-            categories.append("Control1")
-            categories.append("Control2")
-
         # create spike data
         if self.use_spike:
-            self.data["clusterless"] = self.load_data(config.data["spike_path"], categories)
+            self.data["clusterless"] = self.load_data(config.data["spike_path"], config.experiment.train_phases)
 
         # create lfp data
         if self.use_lfp:
-            self.data["lfp"] = self.load_data(config.data["lfp_path"], categories)
+            self.data["lfp"] = self.load_data(config.data["lfp_path"], config.experiment.train_phases)
 
         # for c, category in enumerate(categories):
         #     size = sample_size[c]
