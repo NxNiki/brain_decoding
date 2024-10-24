@@ -46,10 +46,10 @@ class BaseConfig(BaseModel):
         self.__dict__["_alias"][alias] = name
 
     def ensure_list(self, name: str):
+        """Mark the field to always be treated as a list"""
         value = getattr(self, name, None)
         if value is not None and not isinstance(value, list):
             setattr(self, name, [value])
-        # Mark the field to always be treated as a list
         self._list_fields.add(name)
 
 
@@ -117,8 +117,9 @@ class PipelineConfig(BaseModel):
         dir_path = output_file.parent
         dir_path.mkdir(parents=True, exist_ok=True)
 
+        config_data = self.model_dump()
         with open(output_file, "w") as file:
-            yaml.safe_dump(self.model_dump(), file)
+            yaml.safe_dump(config_data, file)
 
     @property
     def _file_tag(self) -> str:

@@ -17,6 +17,7 @@ import wandb
 from brain_decoding.config.config import PipelineConfig
 from brain_decoding.config.file_path import CONFIG_FILE_PATH
 from brain_decoding.param.base_param import device
+from scripts.save_config import config
 
 # torch.autograd.set_detect_anomaly(True)
 # torch.backends.cuda.matmul.allow_tf32=True
@@ -28,9 +29,10 @@ from brain_decoding.param.base_param import device
 
 
 def set_config(
-    config_file: Union[str, Path],
+    config_file: Union[str, Path, PipelineConfig],
     patient_id: int,
-    phases: Union[List[str], str],
+    train_phases: Union[List[str], str],
+    test_phases: Union[List[str], str],
     spike_data_sd: Union[List[float], float, None] = None,
     spike_data_sd_inference: Optional[float] = None,
 ) -> PipelineConfig:
@@ -38,7 +40,8 @@ def set_config(
     set parameters based on config file.
     :param config_file:
     :param patient_id:
-    :param phases:
+    :param train_phases:
+    :param test_phases:
     :param spike_data_sd:
     :param spike_data_sd_inference:
     :return:
@@ -47,15 +50,18 @@ def set_config(
     if isinstance(spike_data_sd, float):
         spike_data_sd = [spike_data_sd]
 
-    config = PipelineConfig.read_config(config_file)
+    if isinstance(config_file, PipelineConfig):
+        config = config_file
+    else:
+        config = PipelineConfig.read_config(config_file)
 
     config.experiment["patient"] = patient_id
     config.experiment.name = "8concepts"
 
-    if isinstance(phases, str):
-        config.data.phases = [phases]
-    else:
-        config.data.phases = phases
+    config.experiment.train_phases = [train_phases]
+
+    config.experiment.test_phases = test_phases
+    config.experiment.ensure_list("test_phases")
 
     if spike_data_sd is not None:
         config.data.spike_data_sd = spike_data_sd
@@ -110,13 +116,16 @@ def pipeline(config: PipelineConfig) -> Trainer:
 
 if __name__ == "__main__":
     patient = 562
-    phase = "2"
+    phase_train = "movie_1"
+    phase_test = "sleep_3"
     CONFIG_FILE = CONFIG_FILE_PATH / "config_sleep-None-None_2024-10-16-19:17:43.yaml"
 
     config = set_config(
-        CONFIG_FILE,
+        # CONFIG_FILE,
+        config,
         patient,
-        phase,
+        phase_train,
+        phase_test,
     )
 
     print("start: ", patient)

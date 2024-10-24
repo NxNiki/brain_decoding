@@ -26,6 +26,8 @@ from scipy.stats import zscore
 
 from brain_decoding.config.file_path import DATA_PATH
 
+SECONDS_PER_HOUR = 3600
+
 OFFSET = {
     "555_1": 4.58,
     "562_1": 0,
@@ -115,8 +117,9 @@ FREE_RECALL_TIME = {
 
 # is there a way to select the whole duration?
 SLEEP_TIME = {
-    "562_1": (0, 2 * 3600),  # memory test
-    "562_2": (0, 5 * 3600),  # memory test
+    "562_1": (0, 2 * SECONDS_PER_HOUR),  # memory test
+    "562_2": (0, 5 * SECONDS_PER_HOUR),  # memory test
+    "562_3": (0, 10 * SECONDS_PER_HOUR),  # memory test
 }
 
 CONTROL = {
@@ -820,7 +823,7 @@ def get_oneshot_by_region(patient_number, desired_samplerate, mode, category="re
 if __name__ == "__main__":
     version = "notch CAR-quant-neg"
     SPIKE_ROOT_PATH = "/Users/XinNiuAdmin/Library/CloudStorage/Box-Box/Vwani_Movie/Clusterless/"
-    get_oneshot_clean("562", 2000, "Experiment6_MovieParadigm_notch", category="sleep", phase=2, version=version)
+    get_oneshot_clean("562", 2000, "Experiment6_MovieParadigm_notch", category="sleep", phase=3, version=version)
     # get_oneshot_clean("562", 2000, "presleep", category="movie", phase=1, version=version)
     # get_oneshot_clean("562", 2000, "presleep", category="recall", phase="FR1", version=version)
     # get_oneshot_clean("562", 2000, "postsleep", category="recall", phase="FR2", version=version)
