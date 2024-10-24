@@ -1,6 +1,6 @@
 import os
-from time import sleep
-from typing import Any, List
+from collections import defaultdict
+from typing import Any, Dict, Iterator, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,11 +10,12 @@ from matplotlib.patches import Patch
 
 from brain_decoding.dataloader.patients import Events
 
-# from brain_decoding.dataloader.save_clusterless import SECONDS_PER_HOUR
-
 PREDICTION_FS = 4
+PREDICTION_VALUE_THRESH = 0.5
 SLEEP_SCORE_FS = 1 / 30
 SLEEP_SCORE_OFFSET = 0
+SLEEP_STAGE_THRESH = 600
+SLEEP_STAGE_COLORMAP = ["Blues", "Reds", "Greens", "Purples"]
 SECONDS_PER_HOUR = 3600
 
 
@@ -129,28 +130,10 @@ def stage_box_plot(predictions: np.ndarray, sleep_score: pd.DataFrame, labels: L
         combined_df_list = []
         show_legend = True if i == 0 else False
 
-        for j in range(len(sleep_score)):
-            start = int(sleep_score.iloc[j]["start_index"])
-            end = int(sleep_score.iloc[j + 1]["start_index"]) if j < len(sleep_score) - 1 else n_samples
-
-            if 0 <= start < predictions.shape[0] and end - start > 600 * PREDICTION_FS:
-                stage_data = predictions[start:end, i]
-                stage_data = stage_data[stage_data > 0.5]  # Filter values greater than 0.5
-                # Calculate stage length (duration in seconds)
-                stage_length = (end - start) / PREDICTION_FS
-                stage_label = f"Stage: {j} ({stage_length:.1f} sec)"
-
-                # Overwrite combined_df each time to save memory
-                combined_df_list.append(
-                    pd.DataFrame(
-                        {
-                            "Stage": [stage_label] * len(stage_data),
-                            "Value(>.5)": stage_data,
-                            "Label": [label] * len(stage_data),
-                            "Stage Label": [sleep_score.iloc[j]["Score"]] * len(stage_data),
-                        }
-                    )
-                )
+        for stage_data in prediction_iterator(
+            predictions[:, i], sleep_score, PREDICTION_VALUE_THRESH, SLEEP_STAGE_THRESH
+        ):
+            combined_df_list.append(pd.DataFrame(stage_data))
 
         combined_df = pd.concat(combined_df_list, axis=0)
         # Sample a maximum of n points per stage for the swarmplot
@@ -194,7 +177,6 @@ def stage_box_plot(predictions: np.ndarray, sleep_score: pd.DataFrame, labels: L
         )
 
         if show_legend:
-            c = ax.collections
             ax.legend(
                 borderaxespad=0.0,
                 loc="right",
@@ -232,6 +214,7 @@ def stage_box_plot(predictions: np.ndarray, sleep_score: pd.DataFrame, labels: L
 
         # Set the title for each subplot
         ax.set_ylabel(label, fontsize=12)
+        ax.set_xlabel("")
         ax.tick_params(axis="x", rotation=45)
 
     # Add overall figure label
@@ -280,7 +263,9 @@ def correlation_heatmap(data: np.ndarray, column_labels: List[str], output_filen
         yticklabels=column_labels,
         ax=ax_heatmap,
     )
-    ax_heatmap.set_title("Correlation Heatmap")
+
+    file_name = os.path.splitext(os.path.basename(output_filename))[0]
+    ax_heatmap.set_title(file_name)
 
     ax_heatmap.set_xticklabels(ax_heatmap.get_xticklabels(), rotation=45, horizontalalignment="right", fontsize=12)
     ax_heatmap.set_yticklabels(ax_heatmap.get_yticklabels(), rotation=0, fontsize=12)
@@ -295,6 +280,136 @@ def correlation_heatmap(data: np.ndarray, column_labels: List[str], output_filen
     plt.tight_layout()
     plt.savefig(output_filename, bbox_inches="tight")
     plt.show()
+
+
+def correlation_heatmap_by_stage(
+    predictions: np.ndarray[float], labels: List[str], sleep_score: pd.DataFrame, result_path: str
+) -> None:
+    for i, (stage_label, start_index, end_index) in enumerate(
+        sleep_stage_iterator(sleep_score, predictions.shape[0], SLEEP_STAGE_THRESH)
+    ):
+        predictions_stage = predictions[start_index:end_index, :]
+        stage_label = stage_label.replace("/", "")
+        file_extension = os.path.splitext(result_path)[1]
+        output_file_name = result_path.replace(file_extension, f"_{i}_{stage_label}{file_extension}")
+        correlation_heatmap(predictions_stage, labels, output_file_name)
+
+
+def multi_facet_correlation_heatmap(
+    predictions: np.ndarray[float], labels: List[str], sleep_score: pd.DataFrame, result_path: str
+) -> None:
+    """
+    Plots a faceted grid of heatmaps for a 3D correlation matrix.
+    Each layer of the 3D matrix is represented as a separate heatmap for better clarity.
+    Histograms are created for each unique label combining correlation values with the same label.
+
+    Args:
+        predictions (np.ndarray): model activation samples by labels.
+        labels (list): List of labels for each dimension (length N).
+        sleep_score: N by 2 dataframe. 1st column: sleep stage, 2nd column start index corresponding predictions.
+    """
+    sleep_stages, correlation_matrix = get_correlation_matrix_by_stage(predictions, sleep_score)
+
+    N, _, M = correlation_matrix.shape
+    if len(sleep_stages) != M:
+        raise ValueError("The length of labels must match the dimensions of the correlation matrix.")
+
+    # Identify unique labels and assign a color map to each
+    unique_labels = list(set(sleep_stages))
+    colormap_dict = {}
+    for i, unique_label in enumerate(unique_labels):
+        colormap_dict[unique_label] = SLEEP_STAGE_COLORMAP[i]
+
+    # Organize plots in a grid with 5 heatmaps per row with additional histgram
+    num_rows = M // 5 + 1  # Calculate the number of rows needed (5 per row)
+    fig, axes = plt.subplots(num_rows, 5, figsize=(25, 5 * num_rows), constrained_layout=True)
+
+    # Flatten axes for easier iteration if there are multiple rows
+    if num_rows > 1:
+        axes = axes.flatten()
+    else:
+        axes = [axes]
+
+    # Create a dictionary to collect correlation values by label
+    correlation_by_label = defaultdict(list)
+
+    # Iterate through each layer and create a heatmap
+    for stage in range(M):
+        ax = axes[stage]
+
+        # Determine the colormap based on the first label in each layer
+        cmap = colormap_dict.get(sleep_stages[stage], "viridis")
+
+        # Create the heatmap
+        sb.heatmap(
+            correlation_matrix[:, :, stage],
+            annot=True,
+            fmt=".2f",
+            cmap=cmap,
+            cbar=False,
+            xticklabels=labels,
+            yticklabels=labels,
+            ax=ax,
+        )
+
+        ax.set_title(f"Stage {stage + 1} - {sleep_stages[stage]}")
+
+        # Collect correlation values by unique label
+        for i in range(N):
+            for j in range(N):
+                if i != j:  # Skip diagonal values
+                    correlation_by_label[sleep_stages[i]].append(correlation_matrix[i, j, stage])
+
+    ax_hist = axes[M]
+    for idx, label in enumerate(unique_labels):
+        ax_hist.hist(
+            correlation_by_label[label],
+            bins=20,
+            color=sb.color_palette(colormap_dict[label])[3],
+            label=label,
+            alpha=0.7,
+            edgecolor=None,
+        )
+
+    ax_hist.legend(title="")
+    ax_hist.set_title(f"Histogram of Correlations")
+    ax_hist.set_xlabel("Correlation Value")
+    ax_hist.set_ylabel("Frequency")
+
+    # Remove any empty subplots
+    for idx in range(M + 1, num_rows * 5):
+        fig.delaxes(axes[idx])
+
+    plt.show()
+
+
+def get_correlation_matrix_by_stage(
+    predictions: np.ndarray[float],
+    sleep_score: pd.DataFrame,
+) -> Tuple[List[str], np.ndarray[float, Any]]:
+    """
+    Calculate correlation matrices for different sleep stages.
+
+    Args:
+        predictions (np.ndarray): A 2D array of predictions (samples x features).
+        sleep_score (pd.DataFrame): DataFrame containing sleep stage labels and start/end indices.
+
+    Returns:
+        Tuple[List[str], np.ndarray]: A list of stage labels and a 3D numpy array of correlation matrices.
+    """
+
+    correlation_matrices = []
+    sleep_stages = []
+    for i, (stage_label, start_index, end_index) in enumerate(
+        sleep_stage_iterator(sleep_score, predictions.shape[0], SLEEP_STAGE_THRESH)
+    ):
+        predictions_stage = predictions[start_index:end_index, :]
+        sleep_stages.append(stage_label.replace("/", "-"))
+        corr_matrix = np.corrcoef(predictions_stage, rowvar=False)
+        correlation_matrices.append(corr_matrix[:, :, np.newaxis])
+
+    correlation_matrix = np.concatenate(correlation_matrices, axis=2)
+    return sleep_stages, correlation_matrix
 
 
 def prediction_heatmap(predictions: np.ndarray[float], events: Events, title: str, file_path: str):
@@ -368,6 +483,62 @@ def combine_continuous_scores(df: pd.DataFrame) -> pd.DataFrame:
     combined_df = combined_df[["Score", "start_index"]]
 
     return combined_df
+
+
+def sleep_stage_iterator(sleep_score: pd.DataFrame, last_index: int, duration_thresh: int) -> Tuple[str, int, int]:
+    for i in range(len(sleep_score)):
+        stage_label = sleep_score.iloc[i]["Score"]
+        start_index = sleep_score.iloc[i]["start_index"]
+
+        if start_index > last_index:
+            break
+
+        # Determine the end index, which is either the next row's start index or the end of prediction
+        if i < len(sleep_score) - 1:
+            next_start_index = sleep_score.iloc[i + 1]["start_index"]
+        else:
+            next_start_index = last_index
+
+        if next_start_index - start_index > duration_thresh * PREDICTION_FS:
+            yield stage_label, start_index, next_start_index
+
+
+def prediction_iterator(
+    prediction: np.ndarray,
+    sleep_score: pd.DataFrame,
+    value_thresh: float,
+    length_thresh: int,
+) -> Dict:
+    """
+    Creates an iterator to loop through slices of the prediction array based on start indices in the sleep_score
+    DataFrame.
+
+    Args:
+        prediction (np.ndarray): A 1D numpy array of prediction values.
+        sleep_score (pd.DataFrame): A DataFrame with 'Score' (str) and 'start_index' (int) columns.
+        value_thresh: remove prediction values less than this value.
+        length_thresh (seconds): ignore sleep stage shorter than this value.
+
+    Yields:
+        Iterator[Tuple[str, np.ndarray]]: An iterator that yields a tuple with a label and the corresponding
+                                          slice of the prediction array.
+    """
+    for i, (label, start_index, end_index) in enumerate(
+        sleep_stage_iterator(sleep_score, len(prediction), length_thresh)
+    ):
+        stage_data = prediction[start_index:end_index]
+        stage_data = stage_data[stage_data > value_thresh]  # Filter values greater than 0.5
+        # Calculate stage length (duration in seconds)
+        stage_length = (end_index - start_index) / PREDICTION_FS
+        stage_label = f"Stage: {i} ({stage_length:.1f} sec)"
+
+        # Overwrite combined_df each time to save memory
+        yield {
+            "Stage": [stage_label] * len(stage_data),
+            "Value(>.5)": stage_data,
+            "Label": [label] * len(stage_data),
+            "Stage Label": [sleep_score.iloc[i]["Score"]] * len(stage_data),
+        }
 
 
 def read_sleep_score(filename: str) -> pd.DataFrame:
