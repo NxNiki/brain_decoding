@@ -18,9 +18,15 @@ SLEEP_STAGE_THRESH = 600
 SLEEP_STAGE_COLORMAP = ["Blues", "Reds", "Greens", "Purples"]
 SECONDS_PER_HOUR = 3600
 
+CONCEPT_LABELS = ["White House", "CIA", "Hostage", "Handcuff", "Jack", "Bill", "Fayed", "Amar"]
+
 
 def prediction_curve(
-    predictions: np.ndarray, sleep_score: pd.DataFrame, labels: List[str], save_file_name: str
+    predictions: np.ndarray,
+    sleep_score: pd.DataFrame,
+    labels: List[str],
+    save_file_name: str,
+    sampling_frequency: int = PREDICTION_FS,
 ) -> None:
     """
     Plot prediction curves with background colors representing sleep stages and a legend.
@@ -50,7 +56,7 @@ def prediction_curve(
     # Loop through each prediction curve
     for i in range(predictions.shape[1]):
         # Calculate time in hours
-        time = np.arange(predictions.shape[0]) / PREDICTION_FS / SECONDS_PER_HOUR
+        time = np.arange(predictions.shape[0]) / sampling_frequency / SECONDS_PER_HOUR
 
         # Plot the prediction curve with time in hours
         sb.lineplot(
@@ -71,14 +77,14 @@ def prediction_curve(
 
         # Add background color based on sleep_score start_index
         for j in range(len(sleep_score)):
-            start = sleep_score.iloc[j]["start_index"] / PREDICTION_FS / SECONDS_PER_HOUR
+            start = sleep_score.iloc[j]["start_index"] / sampling_frequency / SECONDS_PER_HOUR
             end = (
-                sleep_score.iloc[j + 1]["start_index"] / PREDICTION_FS / SECONDS_PER_HOUR
+                sleep_score.iloc[j + 1]["start_index"] / sampling_frequency / SECONDS_PER_HOUR
                 if j < len(sleep_score) - 1
-                else predictions.shape[0] / PREDICTION_FS / SECONDS_PER_HOUR
+                else predictions.shape[0] / sampling_frequency / SECONDS_PER_HOUR
             )
 
-            if 0 <= start < predictions.shape[0] / PREDICTION_FS / SECONDS_PER_HOUR:
+            if 0 <= start < predictions.shape[0] / sampling_frequency / SECONDS_PER_HOUR:
                 color = stage_color_map[sleep_score.iloc[j]["Score"]]
                 axes[i].axvspan(xmin=start, xmax=end, color=color, alpha=0.3)
 
@@ -310,8 +316,8 @@ def multi_facet_correlation_heatmap(
     """
     sleep_stages, correlation_matrix = get_correlation_matrix_by_stage(predictions, sleep_score)
 
-    N, _, M = correlation_matrix.shape
-    if len(sleep_stages) != M:
+    num_label, _, num_stage = correlation_matrix.shape
+    if len(sleep_stages) != num_stage:
         raise ValueError("The length of labels must match the dimensions of the correlation matrix.")
 
     # Identify unique labels and assign a color map to each
@@ -321,7 +327,7 @@ def multi_facet_correlation_heatmap(
         colormap_dict[unique_label] = SLEEP_STAGE_COLORMAP[i]
 
     # Organize plots in a grid with 5 heatmaps per row with additional histgram
-    num_rows = M // 5 + 1  # Calculate the number of rows needed (5 per row)
+    num_rows = num_stage // 5 + 1  # Calculate the number of rows needed (5 per row)
     fig, axes = plt.subplots(num_rows, 5, figsize=(25, 5 * num_rows), constrained_layout=True)
 
     # Flatten axes for easier iteration if there are multiple rows
@@ -334,7 +340,7 @@ def multi_facet_correlation_heatmap(
     correlation_by_label = defaultdict(list)
 
     # Iterate through each layer and create a heatmap
-    for stage in range(M):
+    for stage in range(num_stage):
         ax = axes[stage]
 
         # Determine the colormap based on the first label in each layer
@@ -343,7 +349,7 @@ def multi_facet_correlation_heatmap(
         # Create the heatmap
         sb.heatmap(
             correlation_matrix[:, :, stage],
-            annot=True,
+            annot=False,
             fmt=".2f",
             cmap=cmap,
             cbar=False,
@@ -352,21 +358,33 @@ def multi_facet_correlation_heatmap(
             ax=ax,
         )
 
+        # Annotate only the lower triangle
+        for i in range(num_label):
+            for j in range(i):  # Only for lower triangle
+                ax.text(
+                    j + 0.5,
+                    i + 0.5,  # Offset for centering text
+                    f"{correlation_matrix[i, j, stage]:.2f}",
+                    ha="center",
+                    va="center",
+                    color="black" if correlation_matrix[i, j, stage] < 0 else "white",
+                )
+
         ax.set_title(f"Stage {stage + 1} - {sleep_stages[stage]}")
 
         # Collect correlation values by unique label
-        for i in range(N):
-            for j in range(N):
-                if i != j:  # Skip diagonal values
-                    correlation_by_label[sleep_stages[i]].append(correlation_matrix[i, j, stage])
+        for i in range(num_label):
+            for j in range(i + 1, num_label):
+                correlation_by_label[sleep_stages[stage]].append(correlation_matrix[i, j, stage])
 
-    ax_hist = axes[M]
+    ax_hist = axes[num_stage]
     for idx, label in enumerate(unique_labels):
         ax_hist.hist(
             correlation_by_label[label],
+            density=True,
             bins=20,
             color=sb.color_palette(colormap_dict[label])[3],
-            label=label,
+            label=f"{label}: ({len(correlation_by_label[label])})",
             alpha=0.7,
             edgecolor=None,
         )
@@ -374,10 +392,10 @@ def multi_facet_correlation_heatmap(
     ax_hist.legend(title="")
     ax_hist.set_title(f"Histogram of Correlations")
     ax_hist.set_xlabel("Correlation Value")
-    ax_hist.set_ylabel("Frequency")
+    ax_hist.set_ylabel("Density")
 
     # Remove any empty subplots
-    for idx in range(M + 1, num_rows * 5):
+    for idx in range(num_stage + 1, num_rows * 5):
         fig.delaxes(axes[idx])
 
     plt.show()
@@ -541,17 +559,26 @@ def prediction_iterator(
         }
 
 
-def read_sleep_score(filename: str) -> pd.DataFrame:
+def read_sleep_score(filename: str, signal_fs: float = PREDICTION_FS) -> pd.DataFrame:
     sleep_score = pd.read_csv(filename, header=0)
     print(
         f"shape of sleep_score: {sleep_score.shape}, "
         f"duration: {sleep_score.shape[0] / SLEEP_SCORE_FS / SECONDS_PER_HOUR} hours"
     )
     sleep_score["start_index"] = [
-        int(i * PREDICTION_FS / SLEEP_SCORE_FS + SLEEP_SCORE_OFFSET) for i in range(sleep_score.shape[0])
+        int(i * signal_fs / SLEEP_SCORE_FS + SLEEP_SCORE_OFFSET) for i in range(sleep_score.shape[0])
     ]
     sleep_score = combine_continuous_scores(sleep_score)
 
     print(f"shape of sleep_score after merge: {sleep_score.shape}")
 
     return sleep_score
+
+
+def load_prediction(activation_file: str) -> np.ndarray[float]:
+    predictions = np.load(activation_file)
+    print(
+        f"shape of predictions: {predictions.shape}, duration: {predictions.shape[0] / PREDICTION_FS / SECONDS_PER_HOUR} hours"
+    )
+
+    return predictions
