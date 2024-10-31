@@ -1,9 +1,12 @@
 # burst_analysis.py
 
-from typing import Any, Callable, Dict, List, Optional, Tuple
+import os
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sb
 from numpy import dtype, floating, ndarray
 
 from brain_decoding.utils.analysis import SLEEP_STAGE_THRESH, sleep_stage_iterator
@@ -52,10 +55,10 @@ class BurstAnalysis:
         avg_burst_duration = np.mean(burst_durations) if burst_durations else 0.0
         return avg_burst_duration, burst_durations
 
-    def calculate_ibi(self) -> Optional[floating]:
+    def calculate_ibi(self) -> Union[float, floating[Any]]:
         valid_bursts = self.find_bursts()
         if len(valid_bursts) < 2:
-            return None
+            return np.nan
         ibis = [
             (valid_bursts[i + 1][0] - valid_bursts[i][1]) / self.sampling_rate for i in range(len(valid_bursts) - 1)
         ]
@@ -114,7 +117,9 @@ class ActivationBurstAnalysis(BurstAnalysis):
         # Combine all results into a single np.ndarray with each result as a column
         return np.column_stack(all_results)
 
-    def stage_analysis(self, sleep_score: pd.DataFrame, method: Callable[[], float]) -> ndarray[Any, dtype[Any]]:
+    def stage_analysis(
+        self, sleep_score: pd.DataFrame, method: Callable[[], float]
+    ) -> Tuple[ndarray[Any, dtype[Any]], List[str]]:
         """
         Apply staged analysis (segment-based) to each labeled signal.
 
@@ -126,19 +131,61 @@ class ActivationBurstAnalysis(BurstAnalysis):
         - Dict[str, np.ndarray]: Dictionary with label as key and segment analysis result as value.
         """
         results = []
+        stage_labels = []
 
         # Perform staged analysis for each signal
         for i, label in enumerate(self.labels):
             signal = self.signals[:, i]
             segment_results = []
 
-            for label, start_index, end_index in sleep_stage_iterator(sleep_score, len(signal), SLEEP_STAGE_THRESH):
+            for j, (stage, start_index, end_index) in enumerate(
+                sleep_stage_iterator(sleep_score, len(signal), SLEEP_STAGE_THRESH)
+            ):
                 segment_signal = signal[start_index:end_index]
                 # Set the signal for the inherited BurstAnalysis class
                 self.set_signal(segment_signal, self.sampling_rate)
                 # Call the specified burst analysis method
                 segment_results.append(method())
+                if i == 0:
+                    stage_length = (end_index - start_index) / self.sampling_rate
+                    stage_label = f"{stage} ({j}:{stage_length:.1f} sec)"
+                    stage_labels.append(stage_label)
 
-            results[label] = np.array(segment_results)
+            results.append(segment_results)
 
-        return np.column_stack(results)
+        return np.column_stack(results), stage_labels
+
+
+def dot_plot(data: np.ndarray, x_tick_labels: list, column_labels: list, save_file_name: str):
+    """
+    Plots dot plots for the given data array using a color palette.
+
+    Parameters:
+    - data (np.ndarray): An n x m array, where n is the number of data points and m is the number of curves to plot.
+    - x_tick_labels (list): List of labels for the x-axis ticks (must have n elements).
+    - column_labels (list): List of labels for each series of dots (must have m elements).
+    - save_file_name (str): File name to save the plot.
+
+    Returns:
+    - None: Displays the plot and saves the figure.
+    """
+    if data.shape[1] != len(column_labels):
+        raise ValueError("Number of column labels must match the number of columns in the data array.")
+    if data.shape[0] != len(x_tick_labels):
+        raise ValueError("Number of x-tick labels must match the number of rows in the data array.")
+
+    palette = sb.color_palette("husl", n_colors=data.shape[1])
+
+    x_values = np.arange(data.shape[0])
+    plt.figure(figsize=(10, 6))
+    for i in range(data.shape[1]):
+        plt.plot(x_values, data[:, i], label=column_labels[i], color=palette[i], alpha=0.6)
+
+    plt.xticks(x_values, x_tick_labels, rotation=45, ha="right")
+    plt.ylabel(os.path.basename(save_file_name).replace(".png", ""))
+    plt.title("Burst Analysis")
+    plt.legend()
+    plt.grid(visible=True, linestyle="--", alpha=0.5)
+
+    plt.savefig(save_file_name)
+    plt.show()

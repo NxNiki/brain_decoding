@@ -43,8 +43,8 @@ def prediction_curve(
     # Creating subplots
     palette = sb.color_palette("husl", n_colors=predictions.shape[1])
 
-    y_min = np.min(predictions)
-    y_max = np.max(predictions)
+    y_min = np.nanmin(predictions)
+    y_max = np.nanmax(predictions)
 
     # Assign a unique color for each unique sleep stage
     unique_stages = sleep_score["Score"].unique()
