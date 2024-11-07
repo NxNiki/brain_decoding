@@ -148,7 +148,7 @@ class ActivationBurstAnalysis(BurstAnalysis):
                 segment_results.append(method())
                 if i == 0:
                     stage_length = (end_index - start_index) / self.sampling_rate
-                    stage_label = f"{stage} ({j}:{stage_length:.1f} sec)"
+                    stage_label = f"{stage} ({j}-{stage_length:.1f} sec)"
                     stage_labels.append(stage_label)
 
             results.append(segment_results)
