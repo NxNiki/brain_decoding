@@ -38,3 +38,9 @@ annotations = annotations.groupby("time_bin").max()
 
 np.save(output_filename, annotations[characters].to_numpy().transpose())
 print(annotations.shape)
+
+# merge concepts:
+merged_characters = ["Bella.Swan", "Edward.Cullen", "No.Characters", "Others"]
+other_characters = [c for c in characters if c not in merged_characters]
+annotations["Others"] = annotations[other_characters].max(axis=1)
+np.save(output_filename.replace(".npy", "_merged.npy"), annotations[merged_characters].to_numpy().transpose())

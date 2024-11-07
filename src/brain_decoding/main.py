@@ -57,7 +57,7 @@ def set_config(
 
     config.experiment["patient"] = patient_id
     # config.experiment.name = "8concepts"
-    config.experiment.name = "twilight"
+    config.experiment.name = "twilight_merged"
 
     config.experiment.train_phases = [train_phases]
 
@@ -79,11 +79,12 @@ def set_config(
     config.data.test_save_path = os.path.join(output_path, "test")
     config.data.memory_save_path = os.path.join(output_path, "memory")
 
-    config.data.movie_label_path = str(DATA_PATH / "twilight_concepts.npy")
+    config.data.movie_label_path = str(DATA_PATH / "twilight_concepts_merged.npy")
     config.data.movie_label_sr = 4  # 1 for 24, 4 for twilight
 
-    config.model.num_labels = 18  # 8 for 24, 18 for twilight
+    config.model.num_labels = 4  # 8 for 24, 18 for twilight, 4 for twilight_merged
     config.experiment.train_phases = ["twilight_1"]
+    config.model.labels = ["Bella.Swan", "Edward.Cullen", "No.Characters", "Others"]
 
     return config
 
