@@ -15,7 +15,7 @@ from utils.initializer import initialize_dataloaders, initialize_evaluator, init
 
 import wandb
 from brain_decoding.config.config import PipelineConfig
-from brain_decoding.config.file_path import CONFIG_FILE_PATH
+from brain_decoding.config.file_path import CONFIG_FILE_PATH, DATA_PATH
 from brain_decoding.param.base_param import device
 from scripts.save_config import config
 
@@ -56,7 +56,8 @@ def set_config(
         config = PipelineConfig.read_config(config_file)
 
     config.experiment["patient"] = patient_id
-    config.experiment.name = "8concepts"
+    # config.experiment.name = "8concepts"
+    config.experiment.name = "twilight"
 
     config.experiment.train_phases = [train_phases]
 
@@ -77,6 +78,12 @@ def set_config(
     config.data.valid_save_path = os.path.join(output_path, "valid")
     config.data.test_save_path = os.path.join(output_path, "test")
     config.data.memory_save_path = os.path.join(output_path, "memory")
+
+    config.data.movie_label_path = str(DATA_PATH / "twilight_concepts.npy")
+    config.data.movie_label_sr = 4  # 1 for 24, 4 for twilight
+
+    config.model.num_labels = 18  # 8 for 24, 18 for twilight
+    config.experiment.train_phases = ["twilight_1"]
 
     return config
 
@@ -115,9 +122,9 @@ def pipeline(config: PipelineConfig) -> Trainer:
 
 
 if __name__ == "__main__":
-    patient = 562
-    phase_train = "movie_1"
-    phase_test = "sleep_3"
+    patient = 570
+    phase_train = "twilight_1"
+    phase_test = "sleep_1"
     CONFIG_FILE = CONFIG_FILE_PATH / "config_sleep-None-None_2024-10-16-19:17:43.yaml"
 
     config = set_config(

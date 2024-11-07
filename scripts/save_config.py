@@ -18,7 +18,7 @@ config.model.epochs = 40
 config.model.lr_drop = 50
 config.model.validation_step = 10
 config.model.early_stop = 75
-config.model.num_labels = 8
+config.model.num_labels = 18  # 8 for 24, 18 for twilight
 config.model.merge_label = True
 config.model.img_embedding_size = 192
 config.model.hidden_size = 256
@@ -44,8 +44,8 @@ config.experiment.use_augment = False
 config.experiment.use_shuffle_diagnostic = True
 config.experiment.testing_mode = False  # in testing mode, a maximum of 1e4 clusterless data will be loaded.
 config.experiment.model_aggregate_type = "sum"
-config.experiment.train_phases = ["movie_1"]
-config.experiment.test_phases = ["sleep_2"]
+config.experiment.train_phases = ["twilight_1"]
+config.experiment.test_phases = ["sleep_1"]
 config.experiment.compute_accuracy = False
 
 config.experiment.ensure_list("train_phases")
@@ -61,6 +61,7 @@ config.data.spike_data_sd = [3.5]
 config.data.spike_data_sd_inference = 3.5
 config.data.model_aggregate_type = "sum"
 config.data.movie_label_path = str(DATA_PATH / "8concepts_merged.npy")
+config.data.movie_label_sr = 1
 config.data.movie_sampling_rate = 30
 
 # config.export_config(CONFIG_FILE_PATH)
