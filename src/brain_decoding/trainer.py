@@ -42,12 +42,10 @@ class Trainer:
         self.train_loader = data_loaders["train"]
         self.valid_loader = data_loaders["valid"]
         self.inference_loader = data_loaders["inference"]
-        self.device = device
         self.config = config
 
-        pos_weight_train = torch.tensor(self.train_loader.dataset.pos_weight, dtype=torch.float, device=self.device)
+        pos_weight_train = torch.tensor(self.train_loader.dataset.pos_weight, dtype=torch.float, device=device)
         # pos_weight_val = torch.tensor(self.valid_loader.dataset.pos_weight, dtype=torch.float, device=self.device)
-        # self.bce_loss = nn.BCELoss(reduction="none")
         # self.bce_loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight_train, reduction='none')
         self.bce_loss = nn.BCEWithLogitsLoss(reduction="none")
         self.mse_loss = nn.MSELoss(reduction="none")
@@ -55,15 +53,15 @@ class Trainer:
 
     def extract_feature(self, feature: Union[Tensor, List[Tensor], Tuple[Tensor]]) -> Tuple[Tensor, Tensor]:
         if not self.config.experiment["use_lfp"] and self.config.experiment["use_spike"]:
-            spike = feature.to(self.device)
+            spike = feature.to(device)
             lfp = None
         elif self.config["use_lfp"] and not self.config["use_spike"]:
-            lfp = feature.to(self.device)
+            lfp = feature.to(device)
             spike = None
         else:
             assert isinstance(feature, list) or isinstance(feature, tuple), "Tensor must be a list or tuple"
-            spike = feature[1].to(self.device)
-            lfp = feature[0].to(self.device)
+            spike = feature[1].to(device)
+            lfp = feature[0].to(device)
 
         return spike, lfp
 
@@ -79,12 +77,11 @@ class Trainer:
             y_true = np.empty((0, self.config.model["num_labels"]))
 
             for i, (feature, target, index) in enumerate(self.train_loader):
-                target = target.to(self.device)
+                target = target.to(device)
                 spike, lfp = self.extract_feature(feature)
                 # forward pass
                 spike_emb, lfp_emb, output = self.model(lfp, spike)
-                # mse_loss = self.mse_loss(output, target)
-                mse_loss = self.bce_loss(output, target)
+                mse_loss = self.config.model.train_loss(output, target)
                 # weight_mask = torch.where(target > 0.5, torch.tensor(1.5).to(self.device), torch.tensor(0.5).to(self.device))
                 # mse_loss = torch.mean(mse_loss * weight_mask)
                 mse_loss = torch.mean(mse_loss)
@@ -173,12 +170,12 @@ class Trainer:
             y_score = np.empty((0, self.config["num_labels"]))
             frame_index = np.empty(0)
             for i, (feature, target, index) in enumerate(self.valid_loader):
-                target = target.to(self.device)
+                target = target.to(device)
                 spike, lfp = self.extract_feature(feature)
                 # forward pass
                 spike_emb, lfp_emb, output = self.model(lfp, spike)
                 # mse_loss = self.mse_loss(output, target)
-                mse_loss = self.bce_loss(output, target)
+                mse_loss = self.config.model.train_loss(output, target)
                 # weight_mask = torch.where(target > 0.5, torch.tensor(1.5).to(self.device), torch.tensor(0.5).to(self.device))
                 # mse_loss = torch.mean(mse_loss * weight_mask)
                 mse_loss = torch.mean(mse_loss)
@@ -226,16 +223,16 @@ class Trainer:
             y_true = np.empty((0, self.config["num_labels"]))
             frame_index = np.empty((0))
             for i, (feature, target, index) in enumerate(self.valid_loader):
-                target = target.to(self.device)
+                target = target.to(device)
                 spike, lfp = self.extract_feature(feature)
                 # forward pass
                 spike_emb, lfp_emb, output = self.model(lfp, spike)
                 # mse_loss = self.mse_loss(output, target)
-                mse_loss = self.bce_loss(output, target)
+                mse_loss = self.config.model.train_loss(output, target)
                 weight_mask = torch.where(
                     target > 0.5,
-                    torch.tensor(1.5).to(self.device),
-                    torch.tensor(0.5).to(self.device),
+                    torch.tensor(1.5).to(device),
+                    torch.tensor(0.5).to(device),
                 )
                 mse_loss = torch.mean(mse_loss * weight_mask)
                 # mse_loss = torch.mean(mse_loss)

@@ -17,6 +17,7 @@ import wandb
 from brain_decoding.config.config import PipelineConfig
 from brain_decoding.config.file_path import CONFIG_FILE_PATH, DATA_PATH
 from brain_decoding.param.base_param import device
+from brain_decoding.utils.analysis import concept_frequency
 from scripts.save_config import config
 
 # torch.autograd.set_detect_anomaly(True)
@@ -85,6 +86,11 @@ def set_config(
     config.model.num_labels = 4  # 8 for 24, 18 for twilight, 4 for twilight_merged
     config.experiment.train_phases = ["twilight_1"]
     config.model.labels = ["Bella.Swan", "Edward.Cullen", "No.Characters", "Others"]
+
+    _, concept_weights = concept_frequency(config.data.movie_label_path, config.model.labels)
+    concept_weights = torch.from_numpy(concept_weights.astype(np.float32))
+    concept_weights = concept_weights.to(device)
+    config.model.train_loss = torch.nn.BCEWithLogitsLoss(reduction="none", weight=concept_weights)
 
     return config
 

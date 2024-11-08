@@ -1,4 +1,5 @@
 import os
+import warnings
 from collections import defaultdict
 from typing import Any, Dict, Iterator, List, Tuple
 
@@ -9,8 +10,8 @@ import seaborn as sb
 from matplotlib.patches import Patch
 
 from brain_decoding.dataloader.patients import Events
+from brain_decoding.dataloader.save_clusterless import PREDICTION_FS
 
-PREDICTION_FS = 4
 PREDICTION_VALUE_THRESH = 0.5
 SLEEP_SCORE_FS = 1 / 30
 SLEEP_SCORE_OFFSET = 0
@@ -19,6 +20,41 @@ SLEEP_STAGE_COLORMAP = ["Blues", "Reds", "Greens", "Purples"]
 SECONDS_PER_HOUR = 3600
 
 CONCEPT_LABELS = ["White House", "CIA", "Hostage", "Handcuff", "Jack", "Bill", "Fayed", "Amar"]
+
+
+def concept_frequency(concept_file: str, concept_label: List[str]) -> Tuple[Dict[str, int], np.ndarray[float]]:
+    """
+    Count the frequency of each concept in the concept file and calculate the weight
+
+    Parameters:
+    - concept_file: a .npy file for an n_time by n_concepts array. 1 if concept appears at a time frame.
+    - concept_label:
+    """
+    concept = np.load(concept_file)
+    concept_count = np.sum(concept, axis=1)
+    res = {}
+    weight = []
+    for i, label in enumerate(concept_label):
+        res[label] = int(concept_count[i])
+        weight.append(1 / concept_count[i])
+
+    weight = np.array(weight)
+    weight = weight / np.sum(weight)
+    return res, weight
+
+
+def filter_predictions(predictions: np.ndarray, labels: List[str], thresh: float) -> Tuple:
+    concept_index = np.nanmean(predictions, axis=0) > thresh
+    predictions = predictions[:, concept_index]
+    labels = np.compress(concept_index, np.array(labels)).tolist()
+    return predictions, labels
+
+
+def add_label_count(labels: List[str], labels_count: Dict[str, int]) -> List[str]:
+    labels_with_count = []
+    for label in labels:
+        labels_with_count.append(f"{label} ({labels_count[label]})")
+    return labels_with_count
 
 
 def prediction_curve(
@@ -32,7 +68,7 @@ def prediction_curve(
     Plot prediction curves with background colors representing sleep stages and a legend.
 
     Parameters:
-    - predictions (np.ndarray): n by m array of predictions.
+    - predictions (np.ndarray): n_samples by n_concepts array of predictions.
     - sleep_score (pd.DataFrame): n by 2 DataFrame with sleep stage (column 0) and start index (column 1).
     - labels (List[str]): List of labels for each prediction curve.
     - save_file_name (str): The file path to save the plot.
@@ -40,19 +76,17 @@ def prediction_curve(
     Returns:
     - None: The function saves the figure to the specified output file.
     """
-    # Creating subplots
-    palette = sb.color_palette("husl", n_colors=predictions.shape[1])
 
     y_min = np.nanmin(predictions)
     y_max = np.nanmax(predictions)
 
-    # Assign a unique color for each unique sleep stage
-    unique_stages = sleep_score["Score"].unique()
-    stage_colors = sb.color_palette("Set2", len(unique_stages))
-    stage_color_map = dict(zip(unique_stages, stage_colors))  # Map sleep stages to colors
+    if np.isnan(y_min):
+        warnings.warn("all values in prediction are nan.")
+        return
 
-    fig, axes = plt.subplots(nrows=predictions.shape[1], ncols=1, figsize=(20, 12), sharex=True)
-
+    palette = sb.color_palette("husl", n_colors=predictions.shape[1])
+    fig_height = 2 * len(labels)
+    fig, axes = plt.subplots(nrows=predictions.shape[1], ncols=1, figsize=(20, fig_height), sharex=True)
     # Loop through each prediction curve
     for i in range(predictions.shape[1]):
         # Calculate time in hours
@@ -74,34 +108,38 @@ def prediction_curve(
             color="#808080",
             linestyle="--",
         )
-
-        # Add background color based on sleep_score start_index
-        for j in range(len(sleep_score)):
-            start = sleep_score.iloc[j]["start_index"] / sampling_frequency / SECONDS_PER_HOUR
-            end = (
-                sleep_score.iloc[j + 1]["start_index"] / sampling_frequency / SECONDS_PER_HOUR
-                if j < len(sleep_score) - 1
-                else predictions.shape[0] / sampling_frequency / SECONDS_PER_HOUR
-            )
-
-            if 0 <= start < predictions.shape[0] / sampling_frequency / SECONDS_PER_HOUR:
-                color = stage_color_map[sleep_score.iloc[j]["Score"]]
-                axes[i].axvspan(xmin=start, xmax=end, color=color, alpha=0.3)
-
         # Set y-axis limits and title
         axes[i].set_ylim([y_min, y_max])
         axes[i].set_title(labels[i], fontsize=14)
 
-    # Create custom legend for the background colors
-    legend_elements = [Patch(facecolor=stage_color_map[stage], label=stage, alpha=0.3) for stage in unique_stages]
-    plt.legend(handles=legend_elements, loc="upper right", title="Sleep Stages")
+    if sleep_score:
+        # Assign a unique color for each unique sleep stage
+        unique_stages = sleep_score["Score"].unique()
+        stage_colors = sb.color_palette("Set2", len(unique_stages))
+        stage_color_map = dict(zip(unique_stages, stage_colors))  # Map sleep stages to colors
 
-    # Set a common y-label for the figure
+        for i in range(predictions.shape[1]):
+            # Add background color based on sleep_score start_index
+            for j in range(len(sleep_score)):
+                start = sleep_score.iloc[j]["start_index"] / sampling_frequency / SECONDS_PER_HOUR
+                end = (
+                    sleep_score.iloc[j + 1]["start_index"] / sampling_frequency / SECONDS_PER_HOUR
+                    if j < len(sleep_score) - 1
+                    else predictions.shape[0] / sampling_frequency / SECONDS_PER_HOUR
+                )
+
+                if 0 <= start < predictions.shape[0] / sampling_frequency / SECONDS_PER_HOUR:
+                    color = stage_color_map[sleep_score.iloc[j]["Score"]]
+                    axes[i].axvspan(xmin=start, xmax=end, color=color, alpha=0.3)
+
+        # Create custom legend for the background colors
+        legend_elements = [Patch(facecolor=stage_color_map[stage], label=stage, alpha=0.3) for stage in unique_stages]
+        plt.legend(handles=legend_elements, loc="upper right", title="Sleep Stages")
+
     fig.supylabel("Activation", fontsize=14)
     plt.xlabel("Time (hours)", fontsize=14)
     plt.tight_layout()
 
-    # Save the figure
     plt.savefig(save_file_name)
     plt.show()
 
@@ -121,6 +159,11 @@ def stage_box_plot(predictions: np.ndarray, sleep_score: pd.DataFrame, labels: L
     Returns:
     - None: The function saves the figure with subplots to the specified output file.
     """
+
+    if sleep_score is None:
+        warnings.warn("sleep_score is None!")
+        return
+
     n_samples, n_labels = predictions.shape
 
     # Create subplots for each label (column of predictions)
@@ -313,7 +356,13 @@ def multi_facet_correlation_heatmap(
         predictions (np.ndarray): model activation samples by labels.
         labels (list): List of labels for each dimension (length N).
         sleep_score: N by 2 dataframe. 1st column: sleep stage, 2nd column start index corresponding predictions.
+        result_path: the full path of result file.
     """
+
+    if sleep_score is None:
+        warnings.warn("sleep score is None")
+        return
+
     sleep_stages, correlation_matrix = get_correlation_matrix_by_stage(predictions, sleep_score)
 
     num_label, _, num_stage = correlation_matrix.shape
@@ -398,6 +447,8 @@ def multi_facet_correlation_heatmap(
     for idx in range(num_stage + 1, num_rows * 5):
         fig.delaxes(axes[idx])
 
+    plt.tight_layout()
+    plt.savefig(result_path, bbox_inches="tight")
     plt.show()
 
 
@@ -493,11 +544,7 @@ def combine_continuous_scores(df: pd.DataFrame) -> pd.DataFrame:
 
     # Create a mask to identify where the 'Score' changes
     df["group"] = (df["Score"] != df["Score"].shift()).cumsum()
-
-    # Group by the 'group' column and aggregate 'Score' and 'start_index'
     combined_df = df.groupby("group").agg({"Score": "first", "start_index": "first"}).reset_index(drop=True)
-
-    # Drop the temporary 'group' column if necessary
     combined_df = combined_df[["Score", "start_index"]]
 
     return combined_df
@@ -511,7 +558,6 @@ def sleep_stage_iterator(sleep_score: pd.DataFrame, last_index: int, duration_th
         if start_index > last_index:
             break
 
-        # Determine the end index, which is either the next row's start index or the end of prediction
         if i < len(sleep_score) - 1:
             next_start_index = sleep_score.iloc[i + 1]["start_index"]
         else:
