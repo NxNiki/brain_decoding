@@ -102,3 +102,27 @@ LABELS = [
     "A. Fayed",
     "A. Amar",
 ]
+
+TWILIGHT_LABELS = [
+    "Alice.Cullen",
+    "Angela.Weber",
+    "Bella.Swan",
+    "Billy.Black",
+    "Carlisle.Cullen",
+    "Charlie.Swan",
+    "Edward.Cullen",
+    "Emmett.Cullen",
+    "Eric.Yorkie",
+    "Jacob.Black",
+    "Jasper.Hale",
+    "Jessica.Stanley",
+    "Mike.Newton",
+    "No.Characters",
+    "Rosalie.Hale",
+    "Side.Character",
+    "Renee.Swan",
+    "Tyler.Crowley",
+]
+
+
+TWILIGHT_LABELS_MERGE = ["Bella.Swan", "Edward.Cullen", "No.Characters", "Others"]  # "Others" must be the last element.
