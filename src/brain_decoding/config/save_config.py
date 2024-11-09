@@ -3,6 +3,8 @@ This script is used to define the basic config parameters for a movie decoding p
 Custom parameters can be added to any of the three fields of config (experiment, model, data).
 """
 
+from torch import nn
+
 from brain_decoding.config.config import ExperimentConfig, PipelineConfig
 from brain_decoding.config.file_path import CONFIG_FILE_PATH, DATA_PATH, RESULT_PATH
 
@@ -27,6 +29,7 @@ config.model.num_attention_heads = 8
 config.model.patch_size = (1, 5)
 config.model.intermediate_size = 192 * 2
 config.model.classifier_proj_size = 192
+config.model.train_loss = nn.BCEWithLogitsLoss(reduction="none")
 
 config.experiment.seed = 42
 config.experiment.use_spike = True
@@ -63,5 +66,6 @@ config.data.model_aggregate_type = "sum"
 config.data.movie_label_path = str(DATA_PATH / "8concepts_merged.npy")
 config.data.movie_label_sr = 1
 config.data.movie_sampling_rate = 30
+config.data.filter_low_occurrence_samples = True
 
 # config.export_config(CONFIG_FILE_PATH)

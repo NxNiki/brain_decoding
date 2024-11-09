@@ -3,13 +3,12 @@ import os
 import numpy as np
 import pandas as pd
 
-from brain_decoding.config.file_path import DATA_PATH, TWILIGHT_LABEL_PATH, TWILIGHT_MERGE_LABEL_PATH
+from brain_decoding.config.file_path import TWILIGHT_LABEL_PATH, TWILIGHT_MERGE_LABEL_PATH
 from brain_decoding.param.param_data import TWILIGHT_ANNOTATION_FS, TWILIGHT_LABELS, TWILIGHT_LABELS_MERGE
 
 annotation_file = (
     "/Users/XinNiuAdmin/Library/CloudStorage/Box-Box/Vwani_Movie/movie_info/Twilight_Characters_frame-by-frame_Tinn.csv"
 )
-output_filename = os.path.join(DATA_PATH, "twilight_concepts.npy")
 
 annotations = pd.read_csv(annotation_file, header=0, index_col=None)
 annotations = annotations[annotations["ms"] <= 45 * 60 * 1000]

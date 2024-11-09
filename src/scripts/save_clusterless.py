@@ -33,10 +33,9 @@ from brain_decoding.dataloader.clusterless_clean import (
     load_data_from_bundle,
     sort_file_name,
 )
-from brain_decoding.param.param_data import MOVIE24_ANNOTATION_FS, TWILIGHT_ANNOTATION_FS
+from brain_decoding.param.param_data import MOVIE24_ANNOTATION_FS, PREDICTION_FS, TWILIGHT_ANNOTATION_FS
 
 SECONDS_PER_HOUR = 3600
-PREDICTION_FS = 4
 
 OFFSET = {
     "555_1": 4.58,
@@ -136,7 +135,7 @@ CONTROL = {
 }
 
 TWILIGHT_TIME = {
-    "570": (35.777, 46 * 60 + 52),
+    "570": (35.777, 45 * 60 + 35.777),
 }
 
 MOVIE24_TIME = {
