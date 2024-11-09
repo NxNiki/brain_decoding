@@ -45,10 +45,6 @@ class Trainer:
         self.config = config
 
         pos_weight_train = torch.tensor(self.train_loader.dataset.pos_weight, dtype=torch.float, device=device)
-        # pos_weight_val = torch.tensor(self.valid_loader.dataset.pos_weight, dtype=torch.float, device=self.device)
-        # self.bce_loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight_train, reduction='none')
-        self.bce_loss = nn.BCEWithLogitsLoss(reduction="none")
-        self.mse_loss = nn.MSELoss(reduction="none")
         self.kl_loss = nn.KLDivLoss(reduction="batchmean", log_target=True)
 
     def extract_feature(self, feature: Union[Tensor, List[Tensor], Tuple[Tensor]]) -> Tuple[Tensor, Tensor]:
@@ -68,7 +64,6 @@ class Trainer:
     def train(self, epochs, fold):
         best_f1 = -1
         self.model.train()
-        os.makedirs(self.config.data["train_save_path"], exist_ok=True)
         for epoch in tqdm(range(epochs)):
             meter = Meter(fold)
 
@@ -114,6 +109,7 @@ class Trainer:
             if (epoch + 1) % self.config.model["validation_step"] == 0:
                 # stats = self.validation(fold)
                 # log_info.update(stats)
+                os.makedirs(self.config.data["train_save_path"], exist_ok=True)
                 model_save_path = os.path.join(
                     self.config.data["train_save_path"],
                     "model_weights_epoch{}.tar".format(epoch + 1),
@@ -221,13 +217,12 @@ class Trainer:
             y_pred = np.empty((0, self.config["num_labels"]))
             y_score = np.empty((0, self.config["num_labels"]))
             y_true = np.empty((0, self.config["num_labels"]))
-            frame_index = np.empty((0))
+            frame_index = np.empty(0)
             for i, (feature, target, index) in enumerate(self.valid_loader):
                 target = target.to(device)
                 spike, lfp = self.extract_feature(feature)
                 # forward pass
                 spike_emb, lfp_emb, output = self.model(lfp, spike)
-                # mse_loss = self.mse_loss(output, target)
                 mse_loss = self.config.model.train_loss(output, target)
                 weight_mask = torch.where(
                     target > 0.5,
@@ -385,7 +380,6 @@ class Trainer:
                 # target = target.to(self.device)
                 spike, lfp = self.extract_feature(feature)
                 # forward pass
-
                 # start_time = time.time()
                 spike_emb, lfp_emb, output = model(lfp, spike)
                 # end_time = time.time()
