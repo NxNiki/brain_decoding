@@ -59,8 +59,10 @@ def set_config(
     config.experiment["patient"] = patient_id
     # config.experiment.name = "8concepts"
     config.experiment.name = "twilight_merged"
+    # config.experiment.name = "twilight_vs_24"
 
-    config.experiment.train_phases = [train_phases]
+    config.experiment.train_phases = train_phases
+    config.experiment.ensure_list("train_phases")
 
     config.experiment.test_phases = test_phases
     config.experiment.ensure_list("test_phases")

@@ -1,6 +1,9 @@
 import numpy as np
 
 SF = 2000
+TWILIGHT_ANNOTATION_FS = 4
+MOVIE24_ANNOTATION_FS = 1
+
 OFFSET = {
     "555": 4.58,
     "562": 134.194,
@@ -56,6 +59,7 @@ SPIKE_CHANNEL = {
     "572": 72,
     "i728": 96,
 }  # "565": 80, '566': 72
+
 SPIKE_FRAME = {
     "555": 24,
     "562": 50,
@@ -69,6 +73,7 @@ SPIKE_FRAME = {
     "572": 50,
     "i728": 50,
 }  # 8, 15, 24
+
 LFP_CHANNEL = {
     "555": 208,
     "562": 504,
@@ -80,6 +85,7 @@ LFP_CHANNEL = {
     "568": -1,
     "i728": 912,
 }  # 11*2*8  568
+
 LFP_FRAME = {
     "555": 208,
     "562": 500,

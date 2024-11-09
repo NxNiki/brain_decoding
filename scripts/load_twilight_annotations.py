@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from brain_decoding.config.file_path import DATA_PATH
+from brain_decoding.config.file_path import DATA_PATH, TWILIGHT_LABEL_PATH, TWILIGHT_MERGE_LABEL_PATH
 from brain_decoding.param.param_data import TWILIGHT_ANNOTATION_FS, TWILIGHT_LABELS, TWILIGHT_LABELS_MERGE
 
 annotation_file = (
@@ -16,7 +16,7 @@ annotations = annotations[annotations["ms"] <= 45 * 60 * 1000]
 annotations["time_bin"] = annotations["ms"] // (1000 / TWILIGHT_ANNOTATION_FS)
 annotations = annotations.groupby("time_bin").max()
 
-np.save(output_filename, annotations[TWILIGHT_LABELS].to_numpy().transpose())
+np.save(TWILIGHT_LABEL_PATH, annotations[TWILIGHT_LABELS].to_numpy().transpose())
 print(annotations.shape)
 
 # merge concepts:
@@ -32,4 +32,4 @@ annotations.loc[annotations[[x for x in TWILIGHT_LABELS if x != "No.Characters"]
 
 annotations.loc[annotations[TWILIGHT_LABELS].sum(axis=1) > 1, "Bella.Swan"] = 0
 annotations.loc[annotations[TWILIGHT_LABELS].sum(axis=1) > 1, "Edward.Cullen"] = 0
-np.save(output_filename.replace(".npy", "_merged.npy"), annotations[TWILIGHT_LABELS_MERGE].to_numpy().transpose())
+np.save(TWILIGHT_MERGE_LABEL_PATH, annotations[TWILIGHT_LABELS_MERGE].to_numpy().transpose())

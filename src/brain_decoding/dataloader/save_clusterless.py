@@ -27,7 +27,7 @@ from scipy.signal import butter, filtfilt, find_peaks, hilbert, iirnotch, lfilte
 # from spike_localization import patient_localization_mapping
 from scipy.stats import zscore
 
-from brain_decoding.config.file_path import DATA_PATH, MOVIE_LABEL_PATH
+from brain_decoding.config.file_path import DATA_PATH, MOVIE24_LABEL_PATH
 from brain_decoding.dataloader.clusterless_clean import (
     cross_chan_event_detection,
     load_data_from_bundle,
@@ -169,7 +169,7 @@ def construct_movie_wf(spike_file, patient_number, category, phase):
             continue
         wf_1d[i1:i2] = np.abs(np.min(wf[i]))
 
-    movie_label = np.load(MOVIE_LABEL_PATH)
+    movie_label = np.load(MOVIE24_LABEL_PATH)
     if category == "movie" and isinstance(OFFSET[patient_number + "_" + str(phase)], list):
         if patient_number == "565":
             movie_sample_range = []
@@ -310,7 +310,7 @@ def get_ready(patient_number, desired_samplerate, mode, category="recall", phase
         for sos in notch:
             wf = signal.sosfiltfilt(sos, wf)
 
-        movie_label = np.load(MOVIE_LABEL_PATH)
+        movie_label = np.load(MOVIE24_LABEL_PATH)
         # movie_label = np.repeat(movie_label, resolution, axis=1)
         if category == "recall":
             alignment_offset = 0
@@ -411,7 +411,7 @@ def get_oneshot_blur(patient_number, desired_samplerate, mode, category="recall"
                 continue
             wf_1d[i1:i2] = wf[i]
 
-        movie_label = np.load(MOVIE_LABEL_PATH)
+        movie_label = np.load(MOVIE24_LABEL_PATH)
         # movie_label = np.repeat(movie_label, resolution, axis=1)
         if category == "movie" and isinstance(OFFSET[patient_number + "_" + str(phase)], list):
             if patient_number == "565":
@@ -543,7 +543,7 @@ def get_oneshot_clean(
             for i, (idx, amp) in enumerate(zip(indices1, amplitudes1)):
                 wf_2d[0, idx] = np.max([wf_2d[0, idx], 32])
 
-            movie_label = np.load(MOVIE_LABEL_PATH)
+            movie_label = np.load(MOVIE24_LABEL_PATH)
             if category == "movie" and isinstance(OFFSET[patient_id + "_" + str(phase)], list):
                 if patient_id == "565":
                     exp_sample_range = []
