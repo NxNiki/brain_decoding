@@ -12,7 +12,7 @@ import warnings
 from timeit import default_timer as timer
 
 # from lfp_helper import *
-from typing import List, Union
+from typing import List, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,12 +27,13 @@ from scipy.signal import butter, filtfilt, find_peaks, hilbert, iirnotch, lfilte
 # from spike_localization import patient_localization_mapping
 from scipy.stats import zscore
 
-from brain_decoding.config.file_path import DATA_PATH
+from brain_decoding.config.file_path import DATA_PATH, MOVIE_LABEL_PATH
 from brain_decoding.dataloader.clusterless_clean import (
     cross_chan_event_detection,
     load_data_from_bundle,
     sort_file_name,
 )
+from brain_decoding.param.param_data import MOVIE24_ANNOTATION_FS, TWILIGHT_ANNOTATION_FS
 
 SECONDS_PER_HOUR = 3600
 PREDICTION_FS = 4
@@ -126,8 +127,8 @@ FREE_RECALL_TIME = {
 
 # is there a way to select the whole duration?
 SLEEP_TIME = {
-    "562_1": (0, 10 * SECONDS_PER_HOUR),  # memory test
-    "570_1": (0, 10 * SECONDS_PER_HOUR),
+    "562": (0, 10 * SECONDS_PER_HOUR),  # memory test
+    "570": (0, 10 * SECONDS_PER_HOUR),
 }
 
 CONTROL = {
@@ -135,13 +136,17 @@ CONTROL = {
 }
 
 TWILIGHT_TIME = {
-    "570": (0, 45 * 60),
+    "570": (35.777, 46 * 60 + 52),
+}
+
+MOVIE24_TIME = {
+    "570": (1706308502.12459 - 1706304396.2999392, 1706310981.43703 - 1706304396.2999392),
 }
 
 
-def construct_movie_wf(file, patient_number, category, phase):
-    data = np.load(file)
-    json_path = file.replace(".npz", ".json")
+def construct_movie_wf(spike_file, patient_number, category, phase):
+    data = np.load(spike_file)
+    json_path = spike_file.replace(".npz", ".json")
     with open(json_path, "r") as json_file:
         metadata = json.load(json_file)
 
@@ -160,13 +165,11 @@ def construct_movie_wf(file, patient_number, category, phase):
             print("skip some")
             continue
         if np.any(np.isnan(wf[i])):
-            print("{} contains NaN values.".format(os.path.split(file)[-1]))
+            print("{} contains NaN values.".format(os.path.split(spike_file)[-1]))
             continue
         wf_1d[i1:i2] = np.abs(np.min(wf[i]))
 
-    movie_label_path = f"{DATA_PATH}/8concepts_merged.npy"
-    movie_label = np.load(movie_label_path)
-    # movie_label = np.repeat(movie_label, resolution, axis=1)
+    movie_label = np.load(MOVIE_LABEL_PATH)
     if category == "movie" and isinstance(OFFSET[patient_number + "_" + str(phase)], list):
         if patient_number == "565":
             movie_sample_range = []
@@ -198,11 +201,12 @@ def construct_movie_wf(file, patient_number, category, phase):
             movie_sample_range = [(alignment_offset + recall_start) * sf, (alignment_offset + recall_end) * sf]
             num_samples = int((movie_sample_range[1] - movie_sample_range[0]) / sf * PREDICTION_FS)
         elif category == "twilight":
-            alignment_offset = OFFSET[patient_number + "_" + str(phase)]  # seconds
             start = TWILIGHT_TIME[patient_number][0]
             end = TWILIGHT_TIME[patient_number][1]
-            movie_sample_range = [(alignment_offset + start) * sf, (alignment_offset + end) * sf]
+            movie_sample_range = [start * sf, end * sf]
             num_samples = int((end - start) * PREDICTION_FS)
+        else:
+            raise ValueError("undefined category: {category}")
 
     if patient_number == "565" and category == "movie":
         movie_wf = []
@@ -306,8 +310,7 @@ def get_ready(patient_number, desired_samplerate, mode, category="recall", phase
         for sos in notch:
             wf = signal.sosfiltfilt(sos, wf)
 
-        movie_label_path = "E://projects//Datasets//12concepts//12concepts_merged_more.npy"
-        movie_label = np.load(movie_label_path)
+        movie_label = np.load(MOVIE_LABEL_PATH)
         # movie_label = np.repeat(movie_label, resolution, axis=1)
         if category == "recall":
             alignment_offset = 0
@@ -408,8 +411,7 @@ def get_oneshot_blur(patient_number, desired_samplerate, mode, category="recall"
                 continue
             wf_1d[i1:i2] = wf[i]
 
-        movie_label_path = "E://projects//Datasets//12concepts//12concepts_merged_more.npy"
-        movie_label = np.load(movie_label_path)
+        movie_label = np.load(MOVIE_LABEL_PATH)
         # movie_label = np.repeat(movie_label, resolution, axis=1)
         if category == "movie" and isinstance(OFFSET[patient_number + "_" + str(phase)], list):
             if patient_number == "565":
@@ -474,8 +476,19 @@ def get_oneshot_blur(patient_number, desired_samplerate, mode, category="recall"
         print(os.path.split(file)[-1], np.max(final_spike_data))
 
 
-def get_oneshot_clean(patient_number, desired_samplerate, mode, category, phase=None, version="notch"):
-    spike_path = f"{SPIKE_ROOT_PATH}/{patient_number}/{mode}/"
+def get_exp_range(
+    time_window: Tuple[int, int], sampling_frequency: float, annotation_fs: int = 1
+) -> Tuple[Tuple[float, float], int]:
+    start, end = time_window
+    exp_sample_range = (start * sampling_frequency, end * sampling_frequency)
+    num_samples = int((end - start) * PREDICTION_FS / annotation_fs)
+    return exp_sample_range, num_samples
+
+
+def get_oneshot_clean(
+    patient_id: str, desired_samplerate, mode: str, category: str, phase: int = None, version: str = "notch"
+):
+    spike_path = f"{SPIKE_ROOT_PATH}/{patient_id}/{mode}/"
     spike_files = glob.glob(os.path.join(spike_path, "*.csv"))
     spike_files = sorted(spike_files, key=sort_file_name)
 
@@ -486,7 +499,7 @@ def get_oneshot_clean(patient_number, desired_samplerate, mode, category, phase=
         # df_clean = cross_chan_binned_clean(df, 3, 4)
 
         for channel, data in df_clean.groupby("channel"):
-            save_folder = f"{DATA_PATH}/{patient_number}/{version}/time_{category}_{phase}/"
+            save_folder = f"{DATA_PATH}/{patient_id}/{version}/time_{category}_{phase}/"
             channel_name = re.sub(r"\d+", "", os.path.split(bundle_csv[0])[-1].split(".csv")[0])
             name_last = re.sub(r"\d+", "", os.path.split(bundle_csv[-1])[-1].split(".csv")[0])
             assert channel_name == name_last, "wrong bundle name"
@@ -531,60 +544,51 @@ def get_oneshot_clean(patient_number, desired_samplerate, mode, category, phase=
                 wf_2d[0, idx] = np.max([wf_2d[0, idx], 32])
 
             movie_label = np.load(MOVIE_LABEL_PATH)
-            # movie_label = np.repeat(movie_label, resolution, axis=1)
-            if category == "movie" and isinstance(OFFSET[patient_number + "_" + str(phase)], list):
-                if patient_number == "565":
-                    movie_sample_range = []
+            if category == "movie" and isinstance(OFFSET[patient_id + "_" + str(phase)], list):
+                if patient_id == "565":
+                    exp_sample_range = []
                     num_samples = 0
-                    for alignment_offset in OFFSET[patient_number + "_" + str(phase)]:
+                    for alignment_offset in OFFSET[patient_id + "_" + str(phase)]:
                         sample_range = [alignment_offset[0] * sf, alignment_offset[1] * sf]
-                        movie_sample_range.append(sample_range)
-                        num_samples += int((sample_range[1] - sample_range[0]) // sf * PREDICTION_FS)
+                        exp_sample_range.append(sample_range)
+                        num_samples += int(
+                            (sample_range[1] - sample_range[0]) // sf * PREDICTION_FS / MOVIE24_ANNOTATION_FS
+                        )
                 else:
-                    alignment_offset = OFFSET[patient_number + "_" + str(phase)][phase - 1]
-                    movie_sample_range = [alignment_offset[0] * sf, alignment_offset[1] * sf]
-                    num_samples = int((movie_sample_range[1] - movie_sample_range[0]) / sf * PREDICTION_FS)
+                    alignment_offset = OFFSET[patient_id + "_" + str(phase)][phase - 1]
+                    exp_sample_range = [alignment_offset[0] * sf, alignment_offset[1] * sf]
+                    num_samples = int(
+                        (exp_sample_range[1] - exp_sample_range[0]) / sf * PREDICTION_FS / MOVIE24_ANNOTATION_FS
+                    )
             else:
                 if category == "movie":
-                    alignment_offset = OFFSET[patient_number + "_" + str(phase)]  # seconds
-                    movie_sample_range = [alignment_offset * sf, (alignment_offset + movie_label.shape[-1]) * sf]
-                    num_samples = int(movie_label.shape[-1] * PREDICTION_FS)
+                    exp_sample_range, num_samples = get_exp_range(MOVIE24_TIME[patient_id], sf, MOVIE24_ANNOTATION_FS)
                 elif category == "control":
                     alignment_offset = 0
                     # control_length = min(z.shape[-1], movie_label.shape[-1] * sf)
-                    # movie_sample_range = [alignment_offset * sf, alignment_offset * sf + control_length]
+                    # exp_sample_range = [alignment_offset * sf, alignment_offset * sf + control_length]
                     control_length = 250 * sf
-                    movie_sample_range = [150 * sf, 400 * sf]
-                    num_samples = control_length / sf * 4
+                    exp_sample_range = [150 * sf, 400 * sf]
+                    num_samples = control_length / sf * PREDICTION_FS
                 elif category == "recall":
                     alignment_offset = 0
-                    recall_start = FREE_RECALL_TIME[patient_number + "_" + str(phase)][0]
-                    recall_end = FREE_RECALL_TIME[patient_number + "_" + str(phase)][1]
-                    movie_sample_range = [(alignment_offset + recall_start) * sf, (alignment_offset + recall_end) * sf]
-                    num_samples = int((movie_sample_range[1] - movie_sample_range[0]) / sf * PREDICTION_FS)
-                elif category == "sleep":
-                    alignment_offset = 0
-                    start = SLEEP_TIME[patient_number + "_" + str(phase)][0]
-                    end = SLEEP_TIME[patient_number + "_" + str(phase)][1]
-                    exp_sample_range = [(alignment_offset + start) * sf, (alignment_offset + end) * sf]
+                    recall_start = FREE_RECALL_TIME[patient_id + "_" + str(phase)][0]
+                    recall_end = FREE_RECALL_TIME[patient_id + "_" + str(phase)][1]
+                    exp_sample_range = [(alignment_offset + recall_start) * sf, (alignment_offset + recall_end) * sf]
                     num_samples = int((exp_sample_range[1] - exp_sample_range[0]) / sf * PREDICTION_FS)
+                elif category == "sleep":
+                    exp_sample_range, num_samples = get_exp_range(SLEEP_TIME[patient_id], sf)
                 elif category == "twilight":
-                    alignment_offset = OFFSET[patient_number + "_" + str(phase)]  # seconds
-                    start = TWILIGHT_TIME[patient_number][0]
-                    end = TWILIGHT_TIME[patient_number][1]
-                    exp_sample_range = [(alignment_offset + start) * sf, (alignment_offset + end) * sf]
-                    num_samples = int((end - start) * PREDICTION_FS)
+                    exp_sample_range, num_samples = get_exp_range(SLEEP_TIME[patient_id], sf, TWILIGHT_ANNOTATION_FS)
+                else:
+                    raise ValueError("undefined category: {category}")
 
-            if patient_number == "565" and category == "movie":
+            if patient_id == "565" and category == "movie":
                 movie_wf = []
-                for i, (s, e) in enumerate(movie_sample_range):
+                for i, (s, e) in enumerate(exp_sample_range):
                     movie_wf.append(wf_2d[:, int(s) : int(e)])
                 movie_wf = np.concatenate(movie_wf, axis=0)
-            elif category == "movie":
-                movie_wf = wf_2d[:, int(movie_sample_range[0]) : int(movie_sample_range[1])]
-            elif category == "sleep":
-                movie_wf = wf_2d[:, int(exp_sample_range[0]) : int(exp_sample_range[1])]
-            elif category == "twilight":
+            else:
                 movie_wf = wf_2d[:, int(exp_sample_range[0]) : int(exp_sample_range[1])]
 
             final_spike_data = []
@@ -685,7 +689,5 @@ if __name__ == "__main__":
     version = "notch CAR-quant-neg"
     SPIKE_ROOT_PATH = "/Users/XinNiuAdmin/Library/CloudStorage/Box-Box/Vwani_Movie/Clusterless/"
     # get_oneshot_clean("570", 2000, "Experiment5_MovieParadigm_notch", category="sleep", phase=1, version=version)
-
-    # 45 mins of Twilight was shown first, and then there is Twilight free recall, and then 24 episode, and then 24 memory tasks
-    MOVIE_LABEL_PATH = f"{DATA_PATH}/8concepts_merged.npy"
+    # get_oneshot_clean("570", 2000, "Experiment4_MovieParadigm_notch", category="movie", phase=1, version=version)
     get_oneshot_clean("570", 2000, "Experiment4_MovieParadigm_notch", category="twilight", phase=1, version=version)
