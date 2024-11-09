@@ -7,15 +7,15 @@ from typing import List, Optional, Union
 
 import numpy as np
 import torch
-from trainer import Trainer
-from utils.initializer import initialize_dataloaders, initialize_evaluator, initialize_model
 
 import wandb
 from brain_decoding.config.config import PipelineConfig
-from brain_decoding.config.file_path import CONFIG_FILE_PATH, DATA_PATH
+from brain_decoding.config.file_path import CONFIG_FILE_PATH, DATA_PATH, MOVIE_LABEL_TWILIGHT_VS_24
 from brain_decoding.config.save_config import config
 from brain_decoding.param.base_param import device
+from brain_decoding.trainer import Trainer
 from brain_decoding.utils.analysis import concept_frequency
+from brain_decoding.utils.initializer import initialize_dataloaders, initialize_evaluator, initialize_model
 
 # torch.autograd.set_detect_anomaly(True)
 # torch.backends.cuda.matmul.allow_tf32=True
@@ -54,9 +54,7 @@ def set_config(
         config = PipelineConfig.read_config(config_file)
 
     config.experiment["patient"] = patient_id
-    # config.experiment.name = "8concepts"
-    config.experiment.name = "twilight_merged"
-    # config.experiment.name = "twilight_vs_24"
+    config.experiment.name = "twilight_vs_24"
 
     config.experiment.train_phases = train_phases
     config.experiment.ensure_list("train_phases")
@@ -79,25 +77,13 @@ def set_config(
     config.data.test_save_path = os.path.join(output_path, "test")
     config.data.memory_save_path = os.path.join(output_path, "memory")
 
-    config.data.movie_label_path = str(DATA_PATH / "twilight_concepts_merged.npy")
+    config.data.movie_label_path = MOVIE_LABEL_TWILIGHT_VS_24
     config.data.movie_label_sr = 4  # 1 for 24, 4 for twilight
 
-    config.model.num_labels = 4  # 8 for 24, 18 for twilight, 4 for twilight_merged
-    config.experiment.train_phases = ["twilight_1"]
+    config.model.num_labels = 2  # 8 for 24, 18 for twilight, 4 for twilight_merged
     config.model.labels = ["Bella.Swan", "Edward.Cullen", "No.Characters", "Others"]
 
-    # _, concept_weights = concept_frequency(config.data.movie_label_path, config.model.labels)
-    # concept_weights = torch.from_numpy(concept_weights.astype(np.float32))
-    # concept_weights = concept_weights.to(device)
-    # config.model.train_loss = torch.nn.BCEWithLogitsLoss(reduction="none", weight=concept_weights)
-
     return config
-
-
-def random_string(length: int = 3) -> str:
-    letters = string.ascii_lowercase
-    res = "".join(random.choice(letters) for i in range(length))
-    return res
 
 
 def pipeline(config: PipelineConfig) -> Trainer:
@@ -129,7 +115,7 @@ def pipeline(config: PipelineConfig) -> Trainer:
 
 if __name__ == "__main__":
     patient = 570
-    phase_train = "twilight_1"
+    phase_train = ["twilight_1", "movie_1"]
     phase_test = "sleep_1"
     CONFIG_FILE = CONFIG_FILE_PATH / "config_sleep-None-None_2024-10-16-19:17:43.yaml"
 
@@ -147,7 +133,7 @@ if __name__ == "__main__":
     # os.environ['WANDB_API_KEY'] = '5a6051ed615a193c44eb9f655b81703925460851'
     wandb.login()
     run_name = f"LFP Concept level {config.experiment['patient']} MultiEncoder"
-    wandb.init(project="24_Concepts", name=run_name, reinit=True, entity="24")
+    wandb.init(project="twilight_vs_24_sleep", name=run_name, reinit=True, entity="24")
 
     trainer = pipeline(config)
 

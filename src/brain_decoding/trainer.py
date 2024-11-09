@@ -10,17 +10,17 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.ensemble import Ensemble
 from ray import train
 from sklearn.metrics import f1_score, roc_auc_score, roc_curve
 from torch import Tensor
 from tqdm import tqdm
-from utils.initializer import initialize_inference_dataloaders, initialize_model
-from utils.meters import Meter, TestMeter, ValidMeter
-from utils.permutation import Permutate
 
 import wandb
+from brain_decoding.models.ensemble import Ensemble
 from brain_decoding.param.base_param import device, device_name
+from brain_decoding.utils.initializer import initialize_inference_dataloaders, initialize_model
+from brain_decoding.utils.meters import Meter, TestMeter, ValidMeter
+from brain_decoding.utils.permutation import Permutate
 
 
 class Trainer:

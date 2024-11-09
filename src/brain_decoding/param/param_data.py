@@ -3,6 +3,7 @@ import numpy as np
 SF = 2000
 TWILIGHT_ANNOTATION_FS = 4
 MOVIE24_ANNOTATION_FS = 1
+PREDICTION_FS = 4
 
 OFFSET = {
     "555": 4.58,
@@ -132,3 +133,4 @@ TWILIGHT_LABELS = [
 
 
 TWILIGHT_LABELS_MERGE = ["Bella.Swan", "Edward.Cullen", "No.Characters", "Others"]  # "Others" must be the last element.
+TWILIGHT_24_LABELS = ["Twilight", "24"]

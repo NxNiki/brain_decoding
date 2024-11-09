@@ -1,27 +1,17 @@
-import copy
 import glob
 import os
-import pickle
-import random
-import re
 from collections import defaultdict
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, List, Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import torch
-from scipy.interpolate import interp1d
 from scipy.ndimage import convolve1d
-from scipy.stats import zscore
 from torch.utils.data import DataLoader, Dataset
-from torch.utils.data.sampler import RandomSampler, SubsetRandomSampler, WeightedRandomSampler
-from torchvision.transforms import transforms
+from torch.utils.data.sampler import WeightedRandomSampler
 
 from brain_decoding.config.config import PipelineConfig
 from brain_decoding.dataloader.clusterless_clean import sort_file_name
-from brain_decoding.dataloader.save_clusterless import PREDICTION_FS
 from brain_decoding.param.param_data import SF
+from scripts.save_clusterless import PREDICTION_FS
 
 
 class NeuronDataset:
@@ -72,18 +62,19 @@ class NeuronDataset:
             self.label = self.label[1:-1]
             self.smoothed_label = self.smoothed_label[1:-1]
         # filter low occurrence samples
-        class_value, class_count = np.unique(self.label[:, 0:8], axis=0, return_counts=True)
-        occurrence_threshold = 200 * len(self.spike_data_sd)
-        good_indices = np.where(class_count >= occurrence_threshold)[0]
-        indices_of_good_samples = []
-        for index in good_indices:
-            label = class_value[index]
-            label_indices = np.where((self.label[:, 0:8] == label[None, :]).all(axis=1))[0]
-            indices_of_good_samples.extend(label_indices)
-        indices_of_good_samples = sorted(indices_of_good_samples)
+        if config.data.filter_low_occurrence_samples:
+            class_value, class_count = np.unique(self.label, axis=0, return_counts=True)
+            occurrence_threshold = 200 * len(self.spike_data_sd)
+            good_indices = np.where(class_count >= occurrence_threshold)[0]
+            indices_of_good_samples = []
+            for index in good_indices:
+                label = class_value[index]
+                label_indices = np.where((self.label == label[None, :]).all(axis=1))[0]
+                indices_of_good_samples.extend(label_indices)
+            indices_of_good_samples = sorted(indices_of_good_samples)
 
-        self.label = self.label[indices_of_good_samples]
-        self.smoothed_label = self.smoothed_label[indices_of_good_samples]
+            self.label = self.label[indices_of_good_samples]
+            self.smoothed_label = self.smoothed_label[indices_of_good_samples]
 
         print("Neuron Data Loaded")
         self.preprocess_data()
@@ -400,11 +391,11 @@ def create_weighted_loaders(
         dataset_size = len(dataset)
         all_indices = list(range(dataset_size))
 
-        class_value, class_count = np.unique(dataset.label[:, 0:8], axis=0, return_counts=True)
+        class_value, class_count = np.unique(dataset.label, axis=0, return_counts=True)
 
         class_weight_dict = {key.tobytes(): dataset_size / value for key, value in zip(class_value, class_count)}
 
-        data_weights = np.array([class_weight_dict[label.tobytes()] for label in dataset.label[:, 0:8][all_indices]])
+        data_weights = np.array([class_weight_dict[label.tobytes()] for label in dataset.label[all_indices]])
         train_indices = np.array(all_indices)
 
         os.makedirs(config.data["test_save_path"], exist_ok=True)

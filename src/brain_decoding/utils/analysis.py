@@ -1,7 +1,7 @@
 import os
 import warnings
 from collections import defaultdict
-from typing import Any, Dict, Iterator, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,7 +10,7 @@ import seaborn as sb
 from matplotlib.patches import Patch
 
 from brain_decoding.dataloader.patients import Events
-from brain_decoding.dataloader.save_clusterless import PREDICTION_FS
+from scripts.save_clusterless import PREDICTION_FS
 
 PREDICTION_VALUE_THRESH = 0.5
 SLEEP_SCORE_FS = 1 / 30
