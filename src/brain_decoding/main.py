@@ -29,6 +29,7 @@ from brain_decoding.utils.initializer import initialize_dataloaders, initialize_
 def set_config(
     config_file: Union[str, Path, PipelineConfig],
     patient_id: int,
+    experiment_name: str,
     train_phases: Union[List[str], str],
     test_phases: Union[List[str], str],
     spike_data_sd: Union[List[float], float, None] = None,
@@ -54,9 +55,7 @@ def set_config(
         config = PipelineConfig.read_config(config_file)
 
     config.experiment["patient"] = patient_id
-    # config.experiment.name = "8concepts"
-    config.experiment.name = "twilight_merged"
-    # config.experiment.name = "twilight_vs_24"
+    config.experiment.name = experiment_name
 
     config.experiment.train_phases = train_phases
     config.experiment.ensure_list("train_phases")
