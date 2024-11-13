@@ -1,2 +1,1 @@
 result/**/*.html filter=lfs diff=lfs merge=lfs -text
-results/twilight_merged/570_None_multi-vit_test_optimalX_CARX_2024-11-12_11-57-23/plot_activation.html filter=lfs diff=lfs merge=lfs -text
