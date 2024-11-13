@@ -1,25 +1,17 @@
-import copy
 import glob
 import os
-import pickle
-import random
-import re
 from collections import defaultdict
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, List, Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import torch
-from scipy.interpolate import interp1d
 from scipy.ndimage import convolve1d
-from scipy.stats import zscore
 from torch.utils.data import DataLoader, Dataset
-from torch.utils.data.sampler import RandomSampler, SubsetRandomSampler, WeightedRandomSampler
-from torchvision.transforms import transforms
+from torch.utils.data.sampler import WeightedRandomSampler
 
 from brain_decoding.config.config import PipelineConfig
+from brain_decoding.dataloader.clusterless_clean import sort_file_name
 from brain_decoding.param.param_data import SF
+from scripts.save_clusterless import PREDICTION_FS
 
 
 class NeuronDataset:
@@ -38,19 +30,11 @@ class NeuronDataset:
         self.movie_sampling_rate = config.data["movie_sampling_rate"]
         self.movie_label_path = config.data["movie_label_path"]
 
-        self.resolution = 4
+        self.resolution = PREDICTION_FS
         self.lfp_sf = SF  # Hz
         self.ml_label = np.load(self.movie_label_path)
         # self.ml_label = np.append(self.ml_label, np.zeros((1, self.ml_label.shape[1])), axis=0)
-
-        self.ml_label = np.repeat(self.ml_label, self.resolution, axis=1)
-
-        # add face
-        # face_df = pd.read_csv('/mnt/SSD2/yyding/Datasets/12concepts/face_detection_results.csv')
-        # face = list(face_df['Face Detected'])
-        # face = np.array(face).reshape(1, -1)
-        # face = face[:, :self.ml_label.shape[1]]
-        # self.ml_label = np.concatenate((self.ml_label, face), axis=0)
+        self.ml_label = np.repeat(self.ml_label, int(self.resolution / config.data.movie_label_sr), axis=1)
 
         self.smoothed_ml_label = np.copy(self.ml_label)  # self.smooth_label()
         self.data = defaultdict()
@@ -66,15 +50,6 @@ class NeuronDataset:
         if self.use_lfp:
             self.data["lfp"] = self.load_data(config.data["lfp_path"], config.experiment.train_phases)
 
-        # for c, category in enumerate(categories):
-        #     size = sample_size[c]
-        #     if 'control' in category.lower():
-        #         self.label.append(np.zeros((size, len(self.ml_label)), dtype=np.float32))
-        #         self.smoothed_label.append(np.zeros((size, len(self.ml_label)), dtype=np.float32))
-        #     else:
-        #         self.label.append(self.ml_label.transpose().astype(np.float32))
-        #         self.smoothed_label.append(self.smoothed_ml_label.transpose().astype(np.float32))
-
         for c, category in enumerate(self.spike_data_sd):
             # size = sample_size[c]
             self.label.append(self.ml_label.transpose().astype(np.float32))
@@ -87,18 +62,19 @@ class NeuronDataset:
             self.label = self.label[1:-1]
             self.smoothed_label = self.smoothed_label[1:-1]
         # filter low occurrence samples
-        class_value, class_count = np.unique(self.label[:, 0:8], axis=0, return_counts=True)
-        occurrence_threshold = 200 * len(self.spike_data_sd)
-        good_indices = np.where(class_count >= occurrence_threshold)[0]
-        indices_of_good_samples = []
-        for index in good_indices:
-            label = class_value[index]
-            label_indices = np.where((self.label[:, 0:8] == label[None, :]).all(axis=1))[0]
-            indices_of_good_samples.extend(label_indices)
-        indices_of_good_samples = sorted(indices_of_good_samples)
+        if config.data.filter_low_occurrence_samples:
+            class_value, class_count = np.unique(self.label, axis=0, return_counts=True)
+            occurrence_threshold = 200 * len(self.spike_data_sd)
+            good_indices = np.where(class_count >= occurrence_threshold)[0]
+            indices_of_good_samples = []
+            for index in good_indices:
+                label = class_value[index]
+                label_indices = np.where((self.label == label[None, :]).all(axis=1))[0]
+                indices_of_good_samples.extend(label_indices)
+            indices_of_good_samples = sorted(indices_of_good_samples)
 
-        self.label = self.label[indices_of_good_samples]
-        self.smoothed_label = self.smoothed_label[indices_of_good_samples]
+            self.label = self.label[indices_of_good_samples]
+            self.smoothed_label = self.smoothed_label[indices_of_good_samples]
 
         print("Neuron Data Loaded")
         self.preprocess_data()
@@ -124,36 +100,6 @@ class NeuronDataset:
                 spike_files = sorted(spike_files, key=sort_file_name)
                 spike_data.append(self.load_clustless(spike_files, sd))
                 sample_size.append(spike_data[-1].shape[0])
-
-        # if self.patient == '564':
-        #     min_length = min(arr.shape[0] for arr in self.spike_data)
-        #     self.spike_data = [arr[:min_length] for arr in self.spike_data]
-        #     self.label = [arr[:min_length] for arr in self.label]
-        #     self.smoothed_label = [arr[:min_length] for arr in self.smoothed_label]
-
-        # if self.use_spontaneous:
-        #     target_length = 12800 - 9740
-        #     num_c1, num_c2 = len(self.label[1]), len(self.label[2])
-        #     total_length = num_c1 + num_c2
-        #     ratio_c1 = num_c1 / total_length
-        #     new_num_c1 = int(target_length * ratio_c1)
-        #     new_num_c2 = target_length - new_num_c1
-
-        #     indices_c1 = np.random.choice(num_c1, new_num_c1, replace=False)
-        #     indices_c2 = np.random.choice(num_c2, new_num_c2, replace=False)
-        #     indices_c1 = np.sort(indices_c1)
-        #     indices_c2 = np.sort(indices_c2)
-
-        #     # self.lfp_data[self.lfp_data_mode][1] = self.lfp_data[self.lfp_data_mode][1][indices_c1]
-        #     # self.lfp_data[self.lfp_data_mode][2] = self.lfp_data[self.lfp_data_mode][2][indices_c2]
-        #     self.lfp_data[1] = self.lfp_data[1][indices_c1]
-        #     self.lfp_data[2] = self.lfp_data[2][indices_c2]
-
-        #     self.label[1] = self.label[1][indices_c1]
-        #     self.label[2] = self.label[2][indices_c2]
-
-        #     self.smoothed_label[1] = self.smoothed_label[1][indices_c1]
-        #     self.smoothed_label[2] = self.smoothed_label[2][indices_c2]
 
         return np.concatenate(spike_data, axis=0)
 
@@ -193,60 +139,11 @@ class NeuronDataset:
             spike.append(data[:, :, None])
 
         spike = np.concatenate(spike, axis=2)
-        # sd1 = spike[:, 0:1, :, :]
-        # sd2 = spike[:, 1:2, :, :]
-        # sd3 = spike[:, 2:3, :, :]
-        # spike = np.maximum(np.maximum(sd1, sd2), sd3)
-
-        # data_max = np.max(spike)
-        # for i in range(5):
-        #     spike[(spike > i/5 * data_max) & (spike <= (i+1)/5 * data_max)] = i+1
-        # spike[spike < self.spike_data_sd] = 0
-        # vmax, vmin = self.channel_max(spike)
-        # normalized_spike = 2 * (spike - vmin[None, None, :, None]) / (vmax[None, None, :, None] - vmin[None, None, :, None]) - 1
         spike[spike < sds] = 0
         # spike[spike > 500] = 0
         vmax = np.max(spike)
         normalized_spike = spike / vmax
         return normalized_spike
-        # outlier = 500
-        # spike[np.abs(spike) > outlier] = 0
-        # # p_n = positive - negative
-        # # non_zero_count = (np.abs(negative) != 0).astype(int) + (positive != 0).astype(int)
-        # # p_n = np.divide(np.abs(negative) + positive, non_zero_count, out=np.zeros_like(positive, dtype=np.float32), where=non_zero_count!=0)
-        # b, c, h, w = spike.shape
-        # normalized_spike = spike.transpose(2, 0, 1, 3).reshape(h, -1)
-        # vmax = np.max(normalized_spike, axis=1)
-        # epsilon = 1e-10
-        # vmax = np.where(vmax == 0, epsilon, vmax)
-        # normalized_spike = spike / vmax[None, None, :, None]
-
-        # negative = normalized_spike[:, 0]
-        # positive = normalized_spike[:, 1]
-        # return np.abs(negative)[:, None]
-
-    # def load_clustless(files):
-    #     spike = []
-    #     for file in files:
-    #         data = np.load(file)['data']
-    #         spike.append(data[:, None])
-
-    #     spike = np.concatenate(spike, axis=1)
-
-    #     # outlier = spike.flatten()[spike.flatten() != 0]
-    #     # outlier = np.percentile(outlier, 99.99)
-    #     outlier = 500
-    #     spike[np.abs(spike) > outlier] = 0
-
-    #     b, h, w = spike.shape
-    #     normalized_spike = spike.transpose(1, 0, 2).reshape(h, -1)
-    #     # normalized_spike = zscore(normalized_spike, axis=1)
-    #     normalized_spike = normalized_spike.reshape(h, b, w).transpose(1, 0, 2)
-
-    #     vmin = np.min(normalized_spike)
-    #     vmax = np.max(normalized_spike)
-    #     normalized_spike = (normalized_spike - vmin) / (vmax - vmin)
-    #     return normalized_spike[:, None]
 
     def load_lfp(self, files):
         lfp = []
@@ -350,11 +247,6 @@ class MyDataset(Dataset):
         return (lfp, spike), label, idx
 
 
-def sort_file_name(filenames: List[str]) -> List[Union[int, str]]:
-    """Extract the numeric part of the filename and use it as the sort key"""
-    return [int(x) if x.isdigit() else x for x in re.findall(r"\d+|\D+", filenames)]
-
-
 def create_weighted_loaders(
     dataset: NeuronDataset,
     config: PipelineConfig,
@@ -373,29 +265,7 @@ def create_weighted_loaders(
 
         class_value, class_count = np.unique(dataset.label, axis=0, return_counts=True)
         class_weight_dict = {key.tobytes(): dataset_size / value for key, value in zip(class_value, class_count)}
-        # if config['use_spontaneous']:
-        #     spontaneous_class = class_value[1].tobytes()
-        #     data_weights = np.array([class_weight_dict[label.tobytes()] if label.tobytes() != spontaneous_class
-        #                              else class_weight_dict[label.tobytes()] * 10 for label in dataset.label])
-        # else:
-        #     data_weights = np.array([class_weight_dict[label.tobytes()] for label in dataset.label])
         data_weights = np.array([class_weight_dict[label.tobytes()] for label in dataset.label])
-        # val_indices = []
-        # train_indices = []
-        # for cls in class_value:
-        #     indices = np.where(np.all(dataset.label == cls, axis=1))[0]
-        #     k = int(np.ceil(indices.size * p_val))
-        #     if config['use_shuffle']:
-        #         val = np.random.choice(indices, size=k, replace=False)
-        #         train_mask = np.in1d(indices, val, invert=True)
-        #         train = indices[train_mask]
-        #     else:
-        #         val = indices[-k:]
-        #         train = indices[:-k]
-        #     val_indices.append(val)
-        #     train_indices.append(train)
-        # val_indices = np.concatenate(val_indices, axis=0)
-        # train_indices = np.concatenate(train_indices, axis=0)
         tag_combinations = np.apply_along_axis(lambda x: "".join(map(str, x)), 1, dataset.label)
         unique_combinations, indices = np.unique(tag_combinations, return_inverse=True)
         grouped_indices = {tag: np.where(indices == i)[0] for i, tag in enumerate(unique_combinations)}
@@ -521,16 +391,11 @@ def create_weighted_loaders(
         dataset_size = len(dataset)
         all_indices = list(range(dataset_size))
 
-        class_value, class_count = np.unique(dataset.label[:, 0:8], axis=0, return_counts=True)
+        class_value, class_count = np.unique(dataset.label, axis=0, return_counts=True)
 
         class_weight_dict = {key.tobytes(): dataset_size / value for key, value in zip(class_value, class_count)}
-        # if config['use_spontaneous']:
-        #     spontaneous_class = class_value[1].tobytes()
-        #     data_weights = np.array([class_weight_dict[label.tobytes()] if label.tobytes() != spontaneous_class
-        #                              else class_weight_dict[label.tobytes()] * 10 for label in dataset.label])
-        # else:
-        #     data_weights = np.array([class_weight_dict[label.tobytes()] for label in dataset.label])
-        data_weights = np.array([class_weight_dict[label.tobytes()] for label in dataset.label[:, 0:8][all_indices]])
+
+        data_weights = np.array([class_weight_dict[label.tobytes()] for label in dataset.label[all_indices]])
         train_indices = np.array(all_indices)
 
         os.makedirs(config.data["test_save_path"], exist_ok=True)

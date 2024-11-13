@@ -1,6 +1,10 @@
 import numpy as np
 
 SF = 2000
+TWILIGHT_ANNOTATION_FS = 4
+MOVIE24_ANNOTATION_FS = 1
+PREDICTION_FS = 4
+
 OFFSET = {
     "555": 4.58,
     "562": 134.194,
@@ -52,9 +56,11 @@ SPIKE_CHANNEL = {
     "566": 72,
     "567": 40,
     "568": 80,
+    "570": 80,
     "572": 72,
     "i728": 96,
 }  # "565": 80, '566': 72
+
 SPIKE_FRAME = {
     "555": 24,
     "562": 50,
@@ -64,9 +70,11 @@ SPIKE_FRAME = {
     "566": 50,
     "567": 50,
     "568": 50,
+    "570": 50,  # unverified.
     "572": 50,
     "i728": 50,
 }  # 8, 15, 24
+
 LFP_CHANNEL = {
     "555": 208,
     "562": 504,
@@ -78,6 +86,7 @@ LFP_CHANNEL = {
     "568": -1,
     "i728": 912,
 }  # 11*2*8  568
+
 LFP_FRAME = {
     "555": 208,
     "562": 500,
@@ -100,3 +109,28 @@ LABELS = [
     "A. Fayed",
     "A. Amar",
 ]
+
+TWILIGHT_LABELS = [
+    "Alice.Cullen",
+    "Angela.Weber",
+    "Bella.Swan",
+    "Billy.Black",
+    "Carlisle.Cullen",
+    "Charlie.Swan",
+    "Edward.Cullen",
+    "Emmett.Cullen",
+    "Eric.Yorkie",
+    "Jacob.Black",
+    "Jasper.Hale",
+    "Jessica.Stanley",
+    "Mike.Newton",
+    "No.Characters",
+    "Rosalie.Hale",
+    "Side.Character",
+    "Renee.Swan",
+    "Tyler.Crowley",
+]
+
+
+TWILIGHT_LABELS_MERGE = ["Bella.Swan", "Edward.Cullen", "No.Characters", "Others"]  # "Others" must be the last element.
+TWILIGHT_24_LABELS = ["Twilight", "24"]

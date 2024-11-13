@@ -35,5 +35,10 @@ src/brain_decoding/__pycache__/
 data/
 ._data
 config/*.yaml
-results/
+
+results/**/*.npy
+results/**/*.png
+results/**/*.tar
+!results/**/*.html
+
 wandb/

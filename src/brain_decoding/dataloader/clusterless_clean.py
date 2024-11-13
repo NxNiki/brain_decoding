@@ -1,6 +1,7 @@
 import glob
 import os
 import re
+from typing import List, Union
 
 import numpy as np
 import pandas as pd
@@ -14,6 +15,11 @@ class OpThresh:
     def __init__(self, operator: str, threshold: int):
         self.operator = operator
         self.threshold = threshold
+
+
+def sort_file_name(filenames: str) -> List[Union[int, str]]:
+    """Extract the numeric part of the filename and use it as the sort key"""
+    return [int(x) if x.isdigit() else x for x in re.findall(r"\d+|\D+", filenames)]
 
 
 def find_true_indices(mask, op_thresh: OpThresh = None):
@@ -161,14 +167,10 @@ def load_data_from_bundle(clu_bundle_filepaths):
 
 
 def get_oneshot_clean(patient_number, desired_samplerate, mode, category="recall", phase=None, version="notch"):
-    def sort_filename(filename):
-        """Extract the numeric part of the filename and use it as the sort key"""
-        return [int(x) if x.isdigit() else x for x in re.findall(r"\d+|\D+", filename)]
-
     # folder contains the clustless data, I saved the folder downloaded from the drive as '562/clustless_raw'
     spike_path = f"/mnt/SSD2/yyding/Datasets/neuron/spike_data/{patient_number}/raw_{mode}/"
     spike_files = glob.glob(os.path.join(spike_path, "*.csv"))
-    spike_files = sorted(spike_files, key=sort_filename)
+    spike_files = sorted(spike_files, key=sort_file_name)
 
     for bundle in range(0, len(spike_files), 8):
         df = load_data_from_bundle(spike_files[bundle : bundle + 8])

@@ -15,16 +15,14 @@ from sklearn.metrics import (
 )
 
 import wandb
-from brain_decoding.param.param_data import LABELS
 
 
 class Evaluator:
     def __init__(self, config, fold):
         self.config = config
+        self.classes = config.model.labels
         if config.experiment["use_spontaneous"]:
-            self.classes = LABELS.append("Spontaneous")
-        else:
-            self.classes = LABELS
+            self.classes.append("Spontaneous")
 
         self.fold = fold
 
@@ -36,7 +34,7 @@ class Evaluator:
         # accuracy = (y_pred == y_true).sum() / len(y_true)
         # accuracy = accuracy_score(y_true, y_pred)
         acc = []
-        for i in range(len(self.classes)):
+        for i in range(self.config.model.num_labels):
             acc.append(accuracy_score(y_true[:, i], y_pred[:, i]))
         accuracy = np.mean(acc)
         return accuracy

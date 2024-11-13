@@ -10,17 +10,17 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.ensemble import Ensemble
 from ray import train
 from sklearn.metrics import f1_score, roc_auc_score, roc_curve
 from torch import Tensor
 from tqdm import tqdm
-from utils.initializer import initialize_inference_dataloaders, initialize_model
-from utils.meters import Meter, TestMeter, ValidMeter
-from utils.permutation import Permutate
 
 import wandb
+from brain_decoding.models.ensemble import Ensemble
 from brain_decoding.param.base_param import device, device_name
+from brain_decoding.utils.initializer import initialize_inference_dataloaders, initialize_model
+from brain_decoding.utils.meters import Meter, TestMeter, ValidMeter
+from brain_decoding.utils.permutation import Permutate
 
 
 class Trainer:
@@ -42,35 +42,28 @@ class Trainer:
         self.train_loader = data_loaders["train"]
         self.valid_loader = data_loaders["valid"]
         self.inference_loader = data_loaders["inference"]
-        self.device = device
         self.config = config
 
-        pos_weight_train = torch.tensor(self.train_loader.dataset.pos_weight, dtype=torch.float, device=self.device)
-        # pos_weight_val = torch.tensor(self.valid_loader.dataset.pos_weight, dtype=torch.float, device=self.device)
-        # self.bce_loss = nn.BCELoss(reduction="none")
-        # self.bce_loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight_train, reduction='none')
-        self.bce_loss = nn.BCEWithLogitsLoss(reduction="none")
-        self.mse_loss = nn.MSELoss(reduction="none")
+        pos_weight_train = torch.tensor(self.train_loader.dataset.pos_weight, dtype=torch.float, device=device)
         self.kl_loss = nn.KLDivLoss(reduction="batchmean", log_target=True)
 
     def extract_feature(self, feature: Union[Tensor, List[Tensor], Tuple[Tensor]]) -> Tuple[Tensor, Tensor]:
         if not self.config.experiment["use_lfp"] and self.config.experiment["use_spike"]:
-            spike = feature.to(self.device)
+            spike = feature.to(device)
             lfp = None
         elif self.config["use_lfp"] and not self.config["use_spike"]:
-            lfp = feature.to(self.device)
+            lfp = feature.to(device)
             spike = None
         else:
             assert isinstance(feature, list) or isinstance(feature, tuple), "Tensor must be a list or tuple"
-            spike = feature[1].to(self.device)
-            lfp = feature[0].to(self.device)
+            spike = feature[1].to(device)
+            lfp = feature[0].to(device)
 
         return spike, lfp
 
     def train(self, epochs, fold):
         best_f1 = -1
         self.model.train()
-        os.makedirs(self.config.data["train_save_path"], exist_ok=True)
         for epoch in tqdm(range(epochs)):
             meter = Meter(fold)
 
@@ -79,12 +72,11 @@ class Trainer:
             y_true = np.empty((0, self.config.model["num_labels"]))
 
             for i, (feature, target, index) in enumerate(self.train_loader):
-                target = target.to(self.device)
+                target = target.to(device)
                 spike, lfp = self.extract_feature(feature)
                 # forward pass
                 spike_emb, lfp_emb, output = self.model(lfp, spike)
-                # mse_loss = self.mse_loss(output, target)
-                mse_loss = self.bce_loss(output, target)
+                mse_loss = self.config.model.train_loss(output, target)
                 # weight_mask = torch.where(target > 0.5, torch.tensor(1.5).to(self.device), torch.tensor(0.5).to(self.device))
                 # mse_loss = torch.mean(mse_loss * weight_mask)
                 mse_loss = torch.mean(mse_loss)
@@ -117,6 +109,7 @@ class Trainer:
             if (epoch + 1) % self.config.model["validation_step"] == 0:
                 # stats = self.validation(fold)
                 # log_info.update(stats)
+                os.makedirs(self.config.data["train_save_path"], exist_ok=True)
                 model_save_path = os.path.join(
                     self.config.data["train_save_path"],
                     "model_weights_epoch{}.tar".format(epoch + 1),
@@ -173,12 +166,12 @@ class Trainer:
             y_score = np.empty((0, self.config["num_labels"]))
             frame_index = np.empty(0)
             for i, (feature, target, index) in enumerate(self.valid_loader):
-                target = target.to(self.device)
+                target = target.to(device)
                 spike, lfp = self.extract_feature(feature)
                 # forward pass
                 spike_emb, lfp_emb, output = self.model(lfp, spike)
                 # mse_loss = self.mse_loss(output, target)
-                mse_loss = self.bce_loss(output, target)
+                mse_loss = self.config.model.train_loss(output, target)
                 # weight_mask = torch.where(target > 0.5, torch.tensor(1.5).to(self.device), torch.tensor(0.5).to(self.device))
                 # mse_loss = torch.mean(mse_loss * weight_mask)
                 mse_loss = torch.mean(mse_loss)
@@ -224,18 +217,17 @@ class Trainer:
             y_pred = np.empty((0, self.config["num_labels"]))
             y_score = np.empty((0, self.config["num_labels"]))
             y_true = np.empty((0, self.config["num_labels"]))
-            frame_index = np.empty((0))
+            frame_index = np.empty(0)
             for i, (feature, target, index) in enumerate(self.valid_loader):
-                target = target.to(self.device)
+                target = target.to(device)
                 spike, lfp = self.extract_feature(feature)
                 # forward pass
                 spike_emb, lfp_emb, output = self.model(lfp, spike)
-                # mse_loss = self.mse_loss(output, target)
-                mse_loss = self.bce_loss(output, target)
+                mse_loss = self.config.model.train_loss(output, target)
                 weight_mask = torch.where(
                     target > 0.5,
-                    torch.tensor(1.5).to(self.device),
-                    torch.tensor(0.5).to(self.device),
+                    torch.tensor(1.5).to(device),
+                    torch.tensor(0.5).to(device),
                 )
                 mse_loss = torch.mean(mse_loss * weight_mask)
                 # mse_loss = torch.mean(mse_loss)
@@ -388,7 +380,6 @@ class Trainer:
                 # target = target.to(self.device)
                 spike, lfp = self.extract_feature(feature)
                 # forward pass
-
                 # start_time = time.time()
                 spike_emb, lfp_emb, output = model(lfp, spike)
                 # end_time = time.time()
