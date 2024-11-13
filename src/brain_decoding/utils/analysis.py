@@ -1,9 +1,11 @@
 import os
+import re
 import warnings
 from collections import defaultdict
 from typing import Any, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import pandas as pd
 import seaborn as sb
@@ -20,6 +22,56 @@ SLEEP_STAGE_COLORMAP = ["Blues", "Reds", "Greens", "Purples"]
 SECONDS_PER_HOUR = 3600
 
 CONCEPT_LABELS = ["White House", "CIA", "Hostage", "Handcuff", "Jack", "Bill", "Fayed", "Amar"]
+
+
+def plot_concept_graph(annotation_file: str, labels: List[str], figure_name: str = None):
+    data = np.load(annotation_file)
+    if data.shape[0] < data.shape[1]:
+        data = data.transpose()
+
+    co_occurrence_matrix = np.dot(data.transpose(), data)
+    total_occurrences = data.sum(axis=0)
+    co_occurrence_df = pd.DataFrame(co_occurrence_matrix, index=labels, columns=labels)
+
+    g = nx.Graph()
+    # Add nodes with size attribute based on total occurrences
+    for i, concept in enumerate(co_occurrence_df.columns):
+        g.add_node(concept, size=total_occurrences[i])
+
+    # Add edges with weights (number of co-occurrences)
+    for i, concept1 in enumerate(co_occurrence_df.columns):
+        for j, concept2 in enumerate(co_occurrence_df.columns):
+            if i < j:  # Avoid duplicate edges and self-loops
+                weight = co_occurrence_df.loc[concept1, concept2]
+                if weight > 0:  # Add edge only if there's a co-occurrence
+                    g.add_edge(concept1, concept2, weight=weight)
+
+    pos = nx.circular_layout(g)
+    # pos = nx.spring_layout(g, k=1, seed=42)
+    # Find isolated nodes (nodes with degree 0)
+    # isolated_nodes = [node for node, degree in dict(g.degree()).items() if degree == 0]
+    # for node in isolated_nodes:
+    #     pos[node] = np.array([0.1, 0.3])
+
+    plt.figure(figsize=(12, 10))
+    node_sizes = [g.nodes[concept]["size"] for concept in g.nodes]
+    node_color = (0.4, 0.6, 1.0, 0.6)  # Light blue with 60% opacity (RGBA)
+    nx.draw_networkx_nodes(g, pos, node_size=node_sizes, node_color=[node_color] * len(node_sizes), edgecolors=None)
+    node_labels = {concept: (f"{concept}\n" f"({int(total_occurrences[i])})") for i, concept in enumerate(g.nodes)}
+    nx.draw_networkx_labels(g, pos, labels=node_labels, font_size=7, font_color="black")
+
+    edges = g.edges(data=True)
+    nx.draw_networkx_edges(
+        g, pos, edgelist=edges, width=[np.log2(edge_data["weight"]) / 5 for _, _, edge_data in edges], edge_color="gray"
+    )
+    edge_labels = {(u, v): f"{int(data['weight'])}" for u, v, data in edges}
+    nx.draw_networkx_edge_labels(g, pos, edge_labels=edge_labels, font_size=8, font_color="gray")
+
+    if figure_name:
+        title = os.path.basename(figure_name)
+        plt.title(re.sub(r"\.[a-z]*", "", title))
+        plt.savefig(figure_name, format="png", bbox_inches="tight")
+    plt.show()
 
 
 def concept_frequency(concept_file: str, concept_label: List[str]) -> Tuple[Dict[str, int], np.ndarray[float]]:
@@ -108,7 +160,6 @@ def prediction_curve(
             color="#808080",
             linestyle="--",
         )
-        # Set y-axis limits and title
         axes[i].set_ylim([y_min, y_max])
         axes[i].set_title(labels[i], fontsize=14)
 
@@ -144,7 +195,9 @@ def prediction_curve(
     plt.show()
 
 
-def stage_box_plot(predictions: np.ndarray, sleep_score: pd.DataFrame, labels: List[str], save_file_name: str) -> None:
+def stage_box_plot(
+    predictions: np.ndarray, sleep_score: pd.DataFrame, labels: List[str], save_figure_name: str
+) -> None:
     """
     Plot violin plots with swarms overlaid for each sleep stage, with a separate subplot for each label.
     Limit the number of swarm points per stage for performance improvement and add stage length to the label.
@@ -153,7 +206,7 @@ def stage_box_plot(predictions: np.ndarray, sleep_score: pd.DataFrame, labels: L
     - predictions (np.ndarray): n by m array of predictions.
     - sleep_score (pd.DataFrame): n by 2 DataFrame with sleep stage (column 0) and start index (column 1).
     - labels (List[str]): List of labels for each prediction column.
-    - save_file_name (str): The file path to save the plot.
+    - save_figure_name (str): The file path to save the plot.
     - sampling_rate (int): The sampling rate of the data (default is 4 Hz).
 
     Returns:
@@ -270,11 +323,11 @@ def stage_box_plot(predictions: np.ndarray, sleep_score: pd.DataFrame, labels: L
     plt.tight_layout()
 
     # Save the figure
-    plt.savefig(save_file_name)
+    plt.savefig(save_figure_name)
     plt.show()
 
 
-def correlation_heatmap(data: np.ndarray, column_labels: List[str], output_filename: str) -> None:
+def correlation_heatmap(data: np.ndarray, column_labels: List[str], save_figure_name: str) -> None:
     """
     Calculate the correlation among the columns of the data array and plot a heatmap with the
     distribution of correlation values in a subplot.
@@ -282,7 +335,7 @@ def correlation_heatmap(data: np.ndarray, column_labels: List[str], output_filen
     Parameters:
     - data (np.ndarray): n by m array where n is the number of samples and m is the number of columns.
     - column_labels (List[str]): A list of labels for each column.
-    - output_filename (str): The file path to save the heatmap image.
+    - save_figure_name (str): The file path to save the heatmap image.
 
     Returns:
     - None: The function saves the figure to the specified output file.
@@ -313,7 +366,7 @@ def correlation_heatmap(data: np.ndarray, column_labels: List[str], output_filen
         ax=ax_heatmap,
     )
 
-    file_name = os.path.splitext(os.path.basename(output_filename))[0]
+    file_name = os.path.splitext(os.path.basename(save_figure_name))[0]
     ax_heatmap.set_title(file_name)
 
     ax_heatmap.set_xticklabels(ax_heatmap.get_xticklabels(), rotation=45, horizontalalignment="right", fontsize=12)
@@ -327,7 +380,7 @@ def correlation_heatmap(data: np.ndarray, column_labels: List[str], output_filen
 
     # Save the figure
     plt.tight_layout()
-    plt.savefig(output_filename, bbox_inches="tight")
+    plt.savefig(save_figure_name, bbox_inches="tight")
     plt.show()
 
 
@@ -340,8 +393,8 @@ def correlation_heatmap_by_stage(
         predictions_stage = predictions[start_index:end_index, :]
         stage_label = stage_label.replace("/", "")
         file_extension = os.path.splitext(result_path)[1]
-        output_file_name = result_path.replace(file_extension, f"_{i}_{stage_label}{file_extension}")
-        correlation_heatmap(predictions_stage, labels, output_file_name)
+        figure_name = result_path.replace(file_extension, f"_{i}_{stage_label}{file_extension}")
+        correlation_heatmap(predictions_stage, labels, figure_name)
 
 
 def multi_facet_correlation_heatmap(
@@ -628,3 +681,10 @@ def load_prediction(activation_file: str) -> np.ndarray[float]:
     )
 
     return predictions
+
+
+if __name__ == "__main__":
+    from brain_decoding.config.file_path import TWILIGHT_LABEL_PATH
+    from brain_decoding.param.param_data import TWILIGHT_LABELS
+
+    plot_concept_graph(TWILIGHT_LABEL_PATH, TWILIGHT_LABELS)

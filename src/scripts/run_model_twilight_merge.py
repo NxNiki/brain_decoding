@@ -1,7 +1,5 @@
 import datetime
 import os
-import random
-import string
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -10,13 +8,11 @@ import torch
 
 import wandb
 from brain_decoding.config.config import PipelineConfig
-from brain_decoding.config.file_path import CONFIG_FILE_PATH, DATA_PATH
+from brain_decoding.config.file_path import CONFIG_FILE_PATH, DATA_PATH, TWILIGHT_MERGE_LABEL_PATH
 from brain_decoding.config.save_config import config
 from brain_decoding.main import pipeline, set_config
-from brain_decoding.param.base_param import device
-from brain_decoding.trainer import Trainer
+from brain_decoding.param.param_data import TWILIGHT_LABELS_MERGE
 from brain_decoding.utils.analysis import concept_frequency
-from brain_decoding.utils.initializer import initialize_dataloaders, initialize_evaluator, initialize_model
 
 # torch.autograd.set_detect_anomaly(True)
 # torch.backends.cuda.matmul.allow_tf32=True
@@ -49,12 +45,12 @@ if __name__ == "__main__":
     config.data.test_save_path = os.path.join(output_path, "test")
     config.data.memory_save_path = os.path.join(output_path, "memory")
 
-    config.data.movie_label_path = str(DATA_PATH / "twilight_concepts_merged.npy")
+    config.data.movie_label_path = TWILIGHT_MERGE_LABEL_PATH
     config.data.movie_label_sr = 4  # 1 for 24, 4 for twilight
 
-    config.model.num_labels = 4  # 8 for 24, 18 for twilight, 4 for twilight_merged
     config.experiment.train_phases = ["twilight_1"]
-    config.model.labels = ["Bella.Swan", "Edward.Cullen", "No.Characters", "Others"]
+    config.model.labels = TWILIGHT_LABELS_MERGE
+    config.model.num_labels = len(config.model.labels)
 
     # _, concept_weights = concept_frequency(config.data.movie_label_path, config.model.labels)
     # concept_weights = torch.from_numpy(concept_weights.astype(np.float32))

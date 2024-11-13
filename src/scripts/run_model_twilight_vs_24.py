@@ -10,7 +10,7 @@ import torch
 
 import wandb
 from brain_decoding.config.config import PipelineConfig
-from brain_decoding.config.file_path import CONFIG_FILE_PATH, DATA_PATH, MOVIE_LABEL_TWILIGHT_VS_24
+from brain_decoding.config.file_path import CONFIG_FILE_PATH, MOVIE_LABEL_TWILIGHT_VS_24
 from brain_decoding.config.save_config import config
 from brain_decoding.param.base_param import device
 from brain_decoding.trainer import Trainer
