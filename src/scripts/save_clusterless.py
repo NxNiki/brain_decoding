@@ -127,6 +127,7 @@ FREE_RECALL_TIME = {
 # is there a way to select the whole duration?
 SLEEP_TIME = {
     "562": (0, 10 * SECONDS_PER_HOUR),  # memory test
+    "566": (0, 10 * SECONDS_PER_HOUR),
     "570": (0, 10 * SECONDS_PER_HOUR),
 }
 
@@ -135,10 +136,12 @@ CONTROL = {
 }
 
 TWILIGHT_TIME = {
+    "562": (),
     "570": (35.777, 45 * 60 + 35.777),
 }
 
 MOVIE24_TIME = {
+    "566": (364.104, 45 * 60 + 364.104),
     "570": (1706308502.12459 - 1706304396.2999392, 1706310981.43703 - 1706304396.2999392),
 }
 
@@ -182,10 +185,11 @@ def construct_movie_wf(spike_file, patient_number, category, phase):
             movie_sample_range = [alignment_offset[0] * sf, alignment_offset[1] * sf]
             num_samples = int((movie_sample_range[1] - movie_sample_range[0]) / sf * PREDICTION_FS)
     else:
-        if category == "movie":
-            alignment_offset = OFFSET[patient_number + "_" + str(phase)]  # seconds
-            movie_sample_range = [alignment_offset * sf, (alignment_offset + movie_label.shape[-1]) * sf]
-            num_samples = int(movie_label.shape[-1] * PREDICTION_FS)
+        if category == "movie_24":
+            start = MOVIE24_TIME[patient_number][0]
+            end = MOVIE24_TIME[patient_number][1]
+            movie_sample_range = [start * sf, end * sf]
+            num_samples = int((end - start) * PREDICTION_FS)
         elif category == "control":
             alignment_offset = 0
             # control_length = min(z.shape[-1], movie_label.shape[-1] * sf)
@@ -560,7 +564,7 @@ def get_oneshot_clean(
                         (exp_sample_range[1] - exp_sample_range[0]) / sf * PREDICTION_FS / MOVIE24_ANNOTATION_FS
                     )
             else:
-                if category == "movie":
+                if category == "movie_24":
                     exp_sample_range, num_samples = get_exp_range(MOVIE24_TIME[patient_id], sf, MOVIE24_ANNOTATION_FS)
                 elif category == "control":
                     alignment_offset = 0
@@ -687,6 +691,5 @@ def get_oneshot_by_region(patient_number, desired_samplerate, mode, category="re
 if __name__ == "__main__":
     version = "notch CAR-quant-neg"
     SPIKE_ROOT_PATH = "/Users/XinNiuAdmin/Library/CloudStorage/Box-Box/Vwani_Movie/Clusterless/"
-    # get_oneshot_clean("570", 2000, "Experiment5_MovieParadigm_notch", category="sleep", phase=1, version=version)
-    # get_oneshot_clean("570", 2000, "Experiment4_MovieParadigm_notch", category="movie", phase=1, version=version)
-    get_oneshot_clean("570", 2000, "Experiment4_MovieParadigm_notch", category="twilight", phase=1, version=version)
+
+    get_oneshot_clean("566", 2000, "Experiment8_MovieParadigm_notch", category="sleep", phase=1, version=version)

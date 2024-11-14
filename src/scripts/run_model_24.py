@@ -23,7 +23,7 @@ from brain_decoding.utils.analysis import concept_frequency
 # torch.backends.cudnn.deterministic = True
 
 if __name__ == "__main__":
-    patient = 570
+    patient = 566
     phase_train = "movie_24_1"
     phase_test = "sleep_1"
     experiment_name = "movie_24_merged"
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     # os.environ['WANDB_API_KEY'] = '5a6051ed615a193c44eb9f655b81703925460851'
     wandb.login()
     run_name = f"LFP Concept level {config.experiment['patient']} MultiEncoder"
-    wandb.init(project="movie24_merge", name=run_name, reinit=True, entity="24")
+    wandb.init(project=experiment_name, name=run_name, reinit=True, entity="24")
 
     trainer = pipeline(config)
 
