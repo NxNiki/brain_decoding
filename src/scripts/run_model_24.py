@@ -23,7 +23,7 @@ from brain_decoding.utils.analysis import concept_frequency
 # torch.backends.cudnn.deterministic = True
 
 if __name__ == "__main__":
-    patient = 566
+    patient = 567
     phase_train = "movie_24_1"
     phase_test = "sleep_1"
     experiment_name = "movie_24_merged"
@@ -43,6 +43,9 @@ if __name__ == "__main__":
 
     config.model.labels = MOVIE24_LABELS
     config.model.num_labels = len(config.model.labels)
+
+    config.data.spike_data_mode = "notch"
+    config.data.spike_data_mode_inference = "notch"
 
     # _, concept_weights = concept_frequency(config.data.movie_label_path, config.model.labels)
     # concept_weights = torch.from_numpy(concept_weights.astype(np.float32))
