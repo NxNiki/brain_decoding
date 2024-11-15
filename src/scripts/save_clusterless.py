@@ -124,24 +124,20 @@ FREE_RECALL_TIME = {
     "i728_Ctrl2R1": (28 * 60 + 38, 36 * 60 + 15),
 }
 
-# is there a way to select the whole duration?
-SLEEP_TIME = {
-    "562": (0, 10 * SECONDS_PER_HOUR),  # memory test
-    "566": (0, 10 * SECONDS_PER_HOUR),
-    "570": (0, 10 * SECONDS_PER_HOUR),
-}
+SLEEP_TIME = (0, 10 * SECONDS_PER_HOUR)
 
 CONTROL = {
     "566": [(121, 1520), (1544, 2825)],
 }
 
 TWILIGHT_TIME = {
-    "562": (),
+    "567": (),
     "570": (35.777, 45 * 60 + 35.777),
 }
 
 MOVIE24_TIME = {
     "566": (364.104, 45 * 60 + 364.104),
+    "567": (382.377, 45 * 60 + 382.377),
     "570": (1706308502.12459 - 1706304396.2999392, 1706310981.43703 - 1706304396.2999392),
 }
 
@@ -580,9 +576,9 @@ def get_oneshot_clean(
                     exp_sample_range = [(alignment_offset + recall_start) * sf, (alignment_offset + recall_end) * sf]
                     num_samples = int((exp_sample_range[1] - exp_sample_range[0]) / sf * PREDICTION_FS)
                 elif category == "sleep":
-                    exp_sample_range, num_samples = get_exp_range(SLEEP_TIME[patient_id], sf)
+                    exp_sample_range, num_samples = get_exp_range(SLEEP_TIME, sf)
                 elif category == "twilight":
-                    exp_sample_range, num_samples = get_exp_range(SLEEP_TIME[patient_id], sf, TWILIGHT_ANNOTATION_FS)
+                    exp_sample_range, num_samples = get_exp_range(TWILIGHT_TIME[patient_id], sf, TWILIGHT_ANNOTATION_FS)
                 else:
                     raise ValueError("undefined category: {category}")
 
@@ -689,7 +685,8 @@ def get_oneshot_by_region(patient_number, desired_samplerate, mode, category="re
 
 
 if __name__ == "__main__":
-    version = "notch CAR-quant-neg"
+    # version = "notch"
+    version = "notch"
     SPIKE_ROOT_PATH = "/Users/XinNiuAdmin/Library/CloudStorage/Box-Box/Vwani_Movie/Clusterless/"
 
-    get_oneshot_clean("566", 2000, "Experiment8_MovieParadigm_notch", category="sleep", phase=1, version=version)
+    get_oneshot_clean("567", 2000, f"Experiment9_MovieParadigm_{version}", category="sleep", phase=1, version=version)
