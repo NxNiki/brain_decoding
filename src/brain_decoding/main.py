@@ -14,7 +14,6 @@ from brain_decoding.config.file_path import CONFIG_FILE_PATH, DATA_PATH
 from brain_decoding.config.save_config import config
 from brain_decoding.param.base_param import device
 from brain_decoding.trainer import Trainer
-from brain_decoding.utils.analysis import concept_frequency
 from brain_decoding.utils.initializer import initialize_dataloaders, initialize_evaluator, initialize_model
 
 # torch.autograd.set_detect_anomaly(True)

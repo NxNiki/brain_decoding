@@ -7,20 +7,11 @@ import numpy as np
 import torch
 
 import wandb
-from brain_decoding.config.config import PipelineConfig
 from brain_decoding.config.file_path import CONFIG_FILE_PATH, DATA_PATH, MOVIE24_LABEL_PATH
 from brain_decoding.config.save_config import config
 from brain_decoding.main import pipeline, set_config
 from brain_decoding.param.param_data import MOVIE24_LABELS
 from brain_decoding.utils.analysis import concept_frequency
-
-# torch.autograd.set_detect_anomaly(True)
-# torch.backends.cuda.matmul.allow_tf32=True
-# os.environ['CUBLAS_WORKSPACE_CONFIG'] = ":4096:8"
-# torch.use_deterministic_algorithms(True)
-
-# torch.backends.cudnn.benchmark = False
-# torch.backends.cudnn.deterministic = True
 
 if __name__ == "__main__":
     patient = 567
