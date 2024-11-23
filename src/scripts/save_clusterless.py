@@ -136,9 +136,14 @@ TWILIGHT_TIME = {
 }
 
 MOVIE24_TIME = {
+    "565": (),
     "566": (1691273171.2970471 - 1691272807.193047, 45 * 60 + 1691273171.2970471 - 1691272807.193047),
     "567": (1692748176.5677693 - 1692747794.1907692, 45 * 60 + 1692748176.5677693 - 1692747794.1907692),
-    "570": (1706308502.12459 - 1706304396.2999392, 1706310981.43703 - 1706304396.2999392),
+    "570": (4105.921, 45 * 60 + 4105.921),
+}
+
+SCREENING_TIME = {
+    "570": (0, 40 * 60),
 }
 
 
@@ -685,8 +690,10 @@ def get_oneshot_by_region(patient_number, desired_samplerate, mode, category="re
 
 
 if __name__ == "__main__":
-    # version = "notch"
+    # version = "notch_CAR"
     version = "notch"
     SPIKE_ROOT_PATH = "/Users/XinNiuAdmin/Library/CloudStorage/Box-Box/Vwani_Movie/Clusterless/"
 
-    get_oneshot_clean("567", 2000, f"Experiment9_MovieParadigm_{version}", category="sleep", phase=1, version=version)
+    get_oneshot_clean(
+        "570", 2000, f"Experiment4_MovieParadigm_{version}", category="movie_24", phase=1, version=version
+    )
