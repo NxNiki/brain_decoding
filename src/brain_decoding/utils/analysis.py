@@ -2,7 +2,7 @@ import os
 import re
 import warnings
 from collections import defaultdict
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -196,7 +196,11 @@ def prediction_curve(
 
 
 def stage_box_plot(
-    predictions: np.ndarray, sleep_score: pd.DataFrame, labels: List[str], save_figure_name: str
+    predictions: np.ndarray,
+    sleep_score: pd.DataFrame,
+    labels: List[str],
+    save_figure_name: str,
+    prediction_thresh: Optional[float],
 ) -> None:
     """
     Plot box plots with swarms overlaid for each sleep stage, with a separate subplot for each label.
@@ -207,7 +211,8 @@ def stage_box_plot(
     - sleep_score (pd.DataFrame): n by 2 DataFrame with sleep stage (column 0) and start index (column 1).
     - labels (List[str]): List of labels for each prediction column.
     - save_figure_name (str): The file path to save the plot.
-    - sampling_rate (int): The sampling rate of the data (default is 4 Hz).
+    - prediction_thresh Optional[float]: select concepts (column of predictions) with mean prediction larger than the
+        threshold.
 
     Returns:
     - None: The function saves the figure with subplots to the specified output file.
@@ -216,6 +221,10 @@ def stage_box_plot(
     if sleep_score is None:
         warnings.warn("sleep_score is None!")
         return
+
+    if prediction_thresh:
+        predictions = predictions[:, np.nanmean(predictions, axis=0) > prediction_thresh]
+        labels = labels[np.nanmean(predictions, axis=0) > prediction_thresh]
 
     n_samples, n_labels = predictions.shape
 
