@@ -29,6 +29,7 @@ from scipy.stats import zscore
 
 from brain_decoding.config.file_path import DATA_PATH, MOVIE24_LABEL_PATH
 from brain_decoding.dataloader.clusterless_clean import (
+    cross_chan_binned_clean,
     cross_chan_event_detection,
     load_data_from_bundle,
     sort_file_name,
@@ -499,8 +500,8 @@ def get_oneshot_clean(
     for bundle in range(0, len(spike_files), 8):
         bundle_csv = spike_files[bundle : bundle + 8]
         df = load_data_from_bundle(bundle_csv)
-        df_clean = cross_chan_event_detection(df, 2, 4)
-        # df_clean = cross_chan_binned_clean(df, 3, 4)
+        # df_clean = cross_chan_event_detection(df, 2, 4)
+        df_clean = cross_chan_binned_clean(df, 3, 4)
 
         for channel, data in df_clean.groupby("channel"):
             save_folder = f"{DATA_PATH}/{patient_id}/{version}/time_{category}_{phase}/"
